@@ -114,6 +114,37 @@ You don't design them up front. You discover them from production failures:
 
 Each invariant tightens the schema contract. Strictness compounds.
 
+### How invariant repair works
+
+When an invariant fails, the exact violation string becomes the repair message.
+
+```typescript
+invariants: [
+  (data) => data.end > data.start || "end must be after start",
+]
+```
+
+**Attempt 1** — the model returns:
+
+```json
+{ "start": "2024-03-15", "end": "2024-03-10" }
+```
+
+The invariant fires. The model receives:
+
+> Your response had valid types but violated schema constraints:
+> - end must be after start
+>
+> Please correct these issues and respond with valid JSON only.
+
+**Attempt 2** — the model returns:
+
+```json
+{ "start": "2024-03-15", "end": "2024-03-20" }
+```
+
+Passes. No generic "try again" — the model knew exactly what to fix.
+
 ## Built-in failure handling
 
 Out of the box, `enforce` classifies every failed attempt into one of 8 categories and generates a targeted repair message for each:
