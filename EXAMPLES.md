@@ -106,7 +106,7 @@ async function analyzeSentiment(text: string) {
 
 ---
 
-## Example 2: Invoice Extraction
+## Example 2: Invoice Extraction with Cross-Field Invariants
 
 ### Before
 
@@ -119,7 +119,7 @@ async function extractInvoice(pdfText: string) {
       {
         role: "system",
         content: `Extract these fields from the invoice as JSON:
-- vendorName (string, required)
+- vendor (string, required)
 - invoiceNumber (string, required)
 - date (string in YYYY-MM-DD format)
 - lineItems (array of objects with: description string, quantity number, unitPrice number, amount number)
@@ -144,54 +144,14 @@ Return ONLY valid JSON, no other text.`,
     });
 
     const raw = response.choices[0].message.content ?? "";
-
-    // Try to extract JSON
     let parsed: any;
     try {
-      const stripped = raw
-        .replace(/```json\n?/g, "")
-        .replace(/```\n?/g, "")
-        .trim();
-      parsed = JSON.parse(stripped);
+      parsed = JSON.parse(raw.replace(/```json\n?/g, "").replace(/```\n?/g, "").trim());
     } catch {
       lastError = "Response was not valid JSON";
       continue;
     }
 
-    // Validate vendorName
-    if (!parsed.vendorName || typeof parsed.vendorName !== "string") {
-      lastError = "Missing or invalid vendorName";
-      continue;
-    }
-
-    // Validate invoiceNumber
-    if (!parsed.invoiceNumber || typeof parsed.invoiceNumber !== "string") {
-      lastError = "Missing or invalid invoiceNumber";
-      continue;
-    }
-
-    // Validate lineItems
-    if (!Array.isArray(parsed.lineItems)) {
-      lastError = "lineItems must be an array";
-      continue;
-    }
-
-    let lineItemsValid = true;
-    for (const item of parsed.lineItems) {
-      if (typeof item.description !== "string") {
-        lastError = "lineItem.description must be a string";
-        lineItemsValid = false;
-        break;
-      }
-      if (typeof item.amount !== "number") {
-        lastError = `lineItem.amount must be a number, got ${typeof item.amount}`;
-        lineItemsValid = false;
-        break;
-      }
-    }
-    if (!lineItemsValid) continue;
-
-    // Validate total
     if (typeof parsed.total !== "number") {
       lastError = "total must be a number";
       continue;
@@ -206,13 +166,11 @@ Return ONLY valid JSON, no other text.`,
 
 **Problems:**
 
-- 70+ lines for one extraction
-- Prompt describes the schema in English — can drift from the validation below
-- Validation is incomplete (never checks `date` format, `quantity`, `unitPrice`, `subtotal`, `tax`)
-- Repair message is vague: "Previous response was invalid" — doesn't tell model which field
-- `any` types everywhere — no type safety at all
-- If `amount` comes back as `"250.00"` (string), it fails — even though it's trivially fixable
-- Error thrown at the end loses all context from previous attempts
+- 50+ lines for one extraction
+- Prompt describes the schema in English — can drift from validation
+- No cross-field validation (line items could sum to anything)
+- Repair message is vague — doesn't tell the model which field or constraint
+- `any` types, no runtime enforcement, `"250"` as string causes unnecessary failure
 
 ### After
 
@@ -221,7 +179,7 @@ import { enforce } from "llm-contract";
 import { z } from "zod";
 
 const Invoice = z.object({
-  vendorName: z.string(),
+  vendor: z.string(),
   invoiceNumber: z.string(),
   date: z.string().regex(/^\d{4}-\d{2}-\d{2}$/),
   lineItems: z.array(
@@ -248,6 +206,16 @@ async function extractInvoice(pdfText: string) {
       ],
     });
     return res.choices[0].message.content;
+  }, {
+    invariants: [
+      (d) => {
+        const sum = d.lineItems.reduce((s, i) => s + i.amount, 0);
+        return Math.abs(sum - d.subtotal) < 0.01
+          || `line items sum to ${sum}, but subtotal is ${d.subtotal}`;
+      },
+      (d) => Math.abs(d.subtotal + d.tax - d.total) < 0.01
+        || `subtotal (${d.subtotal}) + tax (${d.tax}) = ${d.subtotal + d.tax}, but total is ${d.total}`,
+    ],
   });
 }
 ```
@@ -255,14 +223,15 @@ async function extractInvoice(pdfText: string) {
 **What changed:**
 
 - Schema validates every field — date format, nested array items, all number fields
+- Invariants enforce cross-field math: line items must sum to subtotal, subtotal + tax must equal total
 - `clean` coerces `"250.00"` → `250` automatically — no wasted retry
-- `fix` generates specific messages: "tax: expected number, got undefined"
+- `fix` generates specific messages: `line items sum to 400, but subtotal is 350`
 - Return type is fully inferred from the Zod schema
-- Failed result includes every attempt's raw output and validation errors
+- See [`examples/extraction.ts`](./examples/extraction.ts) for a runnable simulation
 
 ---
 
-## Example 3: Classification with business rules
+## Example 3: Classification with structural constraints
 
 ### Before
 
@@ -501,8 +470,29 @@ const result = await enforce(
 - Using Anthropic instead of OpenAI — `enforce` doesn't care, you own the call
 - 5 attempts instead of the default 3
 - Exponential backoff between retries
-- Custom invariants that go beyond schema validation (business rules)
+- Custom invariants for structural constraints Zod can't express
 - Hook to observe each attempt
+
+---
+
+## Runnable examples
+
+All examples in `examples/` simulate realistic LLM failures and show the full contract loop:
+
+| File | Domain | What it demonstrates |
+|------|--------|---------------------|
+| [`extraction.ts`](./examples/extraction.ts) | Invoice extraction | Cross-field math invariants, markdown fence cleaning, string-to-number coercion |
+| [`moderation.ts`](./examples/moderation.ts) | Content moderation | Policy consistency invariants (can't block with low confidence) |
+| [`classification.ts`](./examples/classification.ts) | Support ticket routing | Invariant-driven repair (empty tags, summary length) |
+| [`scoring.ts`](./examples/scoring.ts) | Lead scoring | Tier/score alignment invariants, truncated JSON recovery |
+| [`fallback.ts`](./examples/fallback.ts) | Contract review | Cheap-first fallback — contract boundary as escalation decision |
+| [`primitives.ts`](./examples/primitives.ts) | Individual functions | Using `clean`, `check`, `fix`, `select`, `prompt` standalone |
+
+Run any example:
+
+```bash
+npx tsx examples/extraction.ts
+```
 
 ---
 

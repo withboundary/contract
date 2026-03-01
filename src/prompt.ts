@@ -18,7 +18,10 @@ import {
 export function prompt(schema: ZodType): string {
   const shape = describeSchema(schema, 0);
   return [
-    "Respond with a JSON object that matches the following structure exactly.",
+    "Respond with valid JSON matching this structure exactly.",
+    "Include all required fields.",
+    "Do not include extra fields.",
+    "Enum values must match exactly, including casing.",
     "Do not include any text outside the JSON. No markdown fences, no explanation.",
     "",
     shape,

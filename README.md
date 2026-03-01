@@ -17,7 +17,7 @@ LLM calls in most codebases look like this: hand-written format instructions, `J
 1. Generate structural instructions from your schema
 2. Call your model (any provider, any SDK)
 3. Clean raw output into JSON
-4. Validate against the schema and invariants
+4. Validate against the schema (types, fields, enums, invariants)
 5. On failure, feed the exact violation back to the model
 6. Retry with targeted repair (bounded)
 
@@ -60,6 +60,7 @@ if (result.ok) {
 - `result.data` — typed, validated at runtime, no casts
 - Markdown fences, prose wrapping, string-typed numbers — cleaned automatically
 - 3 retries by default, zero config
+- `promptSuffix` — append domain-specific instructions without replacing the defaults
 
 ## What makes this different
 
@@ -83,15 +84,15 @@ prompt → [your LLM call] → clean → check
                               └─ fix ←┘  (on failure)
 ```
 
-`prompt` generates structural instructions from the schema. `clean` normalizes raw output into JSON (strips markdown fences, prose wrapping, coerces string-typed numbers). `check` validates against the schema and invariants. `fix` turns failures into targeted repair messages. `enforce` runs the full loop.
+`prompt` generates structural instructions from the schema. `clean` normalizes raw output into JSON (strips markdown fences, prose wrapping, coerces string-typed numbers). `check` validates against the full schema contract — types, fields, enums, and invariants. `fix` turns failures into targeted repair messages. `enforce` runs the full loop.
 
 Also available: `select` strips input down to only the fields the schema defines — prevents sending PII, secrets, or unrelated data to the model.
 
 ## Invariants
 
-The schema gets you to valid JSON. Invariants get you to correct results.
+Invariants are schema rules that Zod can't express — cross-field checks, conditional requirements, numeric consistency. Zod validates types, fields, and enums. Invariants validate the relationships between them.
 
-The schema catches structural violations — wrong types, missing fields, bad enums. Invariants catch everything the schema can't: business rules, cross-field logic, domain constraints. Return `true` if it passes, or a string describing the violation. That string is the exact feedback the model receives on retry.
+Return `true` if it passes, or a string describing the violation. That string is the exact feedback the model receives on retry.
 
 ```typescript
 invariants: [
@@ -102,16 +103,16 @@ invariants: [
 ]
 ```
 
-Invariants are functions — they can reference your database, config, or any runtime state.
+Each invariant is a function on the parsed data — no external dependencies, no side effects.
 
-You don't design them up front. You promote recurring production failures into enforceable guarantees:
+You don't design them up front. You discover them from production failures:
 
 1. Ship with the schema.
-2. Observe failures via `onAttempt` — every attempt records the category, issues, and raw output.
-3. Notice a pattern.
-4. Add one invariant. That failure mode is now caught, repaired automatically, and never reaches your system again.
+2. Observe failures via `onAttempt`.
+3. Notice a pattern — a field relationship the schema can't enforce.
+4. Add one invariant. That structural failure is now caught and repaired automatically.
 
-Each invariant converts a recurring failure into a permanent structural guarantee. Strictness compounds.
+Each invariant tightens the schema contract. Strictness compounds.
 
 ## Built-in failure handling
 
@@ -125,7 +126,7 @@ Out of the box, `enforce` classifies every failed attempt into one of 8 categori
 | `TRUNCATED` | JSON cut off (unbalanced braces) | Ask for a shorter, complete response |
 | `PARSE_ERROR` | JSON present but malformed | Ask for strictly valid JSON |
 | `VALIDATION_ERROR` | Valid JSON but failed schema | List the specific Zod errors |
-| `INVARIANT_ERROR` | Schema passed but invariant failed | List the specific violation strings |
+| `INVARIANT_ERROR` | Correct types but failed structural constraints | List the specific constraint violations |
 | `RUN_ERROR` | Your function threw an exception | Ask to try again |
 
 Before validation, `clean` automatically strips markdown fences, extracts JSON from prose, and coerces string-typed values (`"85"` to `85`, `"true"` to `true`).
@@ -166,7 +167,7 @@ npm install llm-contract zod
 ## Further reading
 
 - [API reference](./API.md) — full function signatures and options
-- [Examples](./examples) — runnable demos (sentiment, invoice extraction, classification, fallback chains)
+- [Examples](./examples) — runnable demos (extraction, moderation, classification, scoring, fallback, primitives)
 - [EXAMPLES.md](./EXAMPLES.md) — detailed before/after comparisons
 
 ## License

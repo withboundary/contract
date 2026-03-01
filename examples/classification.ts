@@ -1,5 +1,10 @@
 /**
- * Enum classification with custom invariants.
+ * Support ticket classification with realistic failure simulation.
+ *
+ * Simulates realistic LLM failures:
+ *   Attempt 1 — valid JSON but empty tags array
+ *   Attempt 2 — model adds tags after invariant feedback, but summary is 250+ chars
+ *   Attempt 3 — model returns compliant output
  *
  *   npx tsx examples/classification.ts
  */
@@ -13,42 +18,65 @@ const TicketSchema = z.object({
   summary: z.string(),
 });
 
-async function main() {
-  const ticket =
-    "My payment was charged twice for the Pro plan last month. Please refund the duplicate charge.";
+type Ticket = z.infer<typeof TicketSchema>;
 
+function simulateLLM(attemptNumber: number): string {
+  if (attemptNumber === 1) {
+    return JSON.stringify({
+      category: "billing",
+      priority: "high",
+      tags: [],
+      summary: "Customer was charged twice for the Pro plan and is requesting a refund.",
+    });
+  }
+
+  if (attemptNumber === 2) {
+    return JSON.stringify({
+      category: "billing",
+      priority: "high",
+      tags: ["billing", "refund", "duplicate-charge"],
+      summary:
+        "The customer reports that their credit card was charged twice for the Pro plan subscription last month. " +
+        "They are requesting a full refund for the duplicate charge. The customer has been a subscriber for 18 months " +
+        "and has not had previous billing issues. This is a high-priority item due to potential chargeback risk.",
+    });
+  }
+
+  return JSON.stringify({
+    category: "billing",
+    priority: "high",
+    tags: ["billing", "refund", "duplicate-charge"],
+    summary: "Duplicate Pro plan charge — customer requesting refund for second payment",
+  });
+}
+
+async function main() {
   const result = await enforce(
     TicketSchema,
-    async (attempt) => {
-      // Replace with your real LLM call
-      return JSON.stringify({
-        category: "billing",
-        priority: "high",
-        tags: ["billing", "refund", "duplicate-charge"],
-        summary: "Duplicate charge for Pro plan, requesting refund",
-      });
-    },
+    async (attempt) => simulateLLM(attempt.number),
     {
       invariants: [
-        (t) =>
-          t.summary.length <= 200 ||
-          `summary too long: ${t.summary.length} chars (max 200)`,
-        (t) =>
+        (t: Ticket) =>
           t.tags.length > 0 || "must have at least one tag",
+        (t: Ticket) =>
+          t.summary.length <= 200
+            || `summary too long: ${t.summary.length} chars (max 200)`,
       ],
       onAttempt: (event) => {
-        console.log(
-          `Attempt ${event.number}: ${event.ok ? "PASS" : "FAIL"} (${event.durationMS}ms)`,
-        );
+        const status = event.ok ? "PASS" : `FAIL — ${event.category}`;
+        const issues = event.issues.length > 0 ? `\n    ${event.issues.join("\n    ")}` : "";
+        console.log(`  Attempt ${event.number}: ${status} (${event.durationMS}ms)${issues}`);
       },
     },
   );
 
+  console.log();
   if (result.ok) {
-    console.log("Category:", result.data.category);
-    console.log("Priority:", result.data.priority);
-    console.log("Tags:", result.data.tags.join(", "));
-    console.log("Summary:", result.data.summary);
+    console.log(`Category: ${result.data.category}`);
+    console.log(`Priority: ${result.data.priority}`);
+    console.log(`Tags: ${result.data.tags.join(", ")}`);
+    console.log(`Summary: ${result.data.summary}`);
+    console.log(`Attempts: ${result.attempts}`);
   } else {
     console.error("Failed:", result.error.message);
   }

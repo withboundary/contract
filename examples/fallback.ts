@@ -1,6 +1,13 @@
 /**
  * Cheap-first fallback: try a fast model, escalate to a stronger one.
  *
+ * The contract boundary is the escalation decision — not heuristics.
+ *
+ * Simulates:
+ *   Cheap model — returns bad enum ("go ahead" instead of "approve"|"reject"|"review")
+ *                 twice, exhausting maxAttempts
+ *   Strong model — returns compliant output on first attempt
+ *
  *   npx tsx examples/fallback.ts
  */
 import { enforce } from "../src/index.js";
@@ -12,47 +19,86 @@ const AnalysisSchema = z.object({
   recommendation: z.enum(["approve", "reject", "review"]),
 });
 
-async function analyzeCheap(): Promise<
-  ReturnType<typeof enforce<z.infer<typeof AnalysisSchema>>>
-> {
-  return enforce(
-    AnalysisSchema,
-    async (attempt) => {
-      // Simulate cheap model returning bad data
-      return '{"summary": "Looks fine", "risks": [], "recommendation": "go ahead"}';
-    },
-    { maxAttempts: 2 },
-  );
-}
+type Analysis = z.infer<typeof AnalysisSchema>;
 
-async function analyzeStrong(): Promise<
-  ReturnType<typeof enforce<z.infer<typeof AnalysisSchema>>>
-> {
-  return enforce(AnalysisSchema, async (attempt) => {
-    // Simulate strong model getting it right
-    return JSON.stringify({
-      summary: "Contract review shows standard terms with minor risk areas",
-      risks: ["Auto-renewal clause in section 4", "Liability cap below market rate"],
-      recommendation: "review",
-    });
+function simulateCheapModel(_attemptNumber: number): string {
+  return JSON.stringify({
+    summary: "Looks fine overall",
+    risks: [],
+    recommendation: "go ahead",
   });
 }
 
+function simulateStrongModel(_attemptNumber: number): string {
+  return JSON.stringify({
+    summary: "Contract review shows standard terms with minor risk areas in auto-renewal and liability",
+    risks: [
+      "Auto-renewal clause in section 4 — 90-day cancellation window",
+      "Liability cap at 2x annual fee — below market rate",
+    ],
+    recommendation: "review",
+  });
+}
+
+async function analyzeCheap() {
+  console.log("--- Cheap model ---");
+  return enforce(
+    AnalysisSchema,
+    async (attempt) => simulateCheapModel(attempt.number),
+    {
+      maxAttempts: 2,
+      invariants: [
+        (d: Analysis) =>
+          d.risks.length > 0 || d.recommendation === "approve"
+            || "non-approve recommendation must cite at least one risk",
+      ],
+      onAttempt: (event) => {
+        const status = event.ok ? "PASS" : `FAIL — ${event.category}`;
+        const issues = event.issues.length > 0 ? `\n    ${event.issues.join("\n    ")}` : "";
+        console.log(`  Attempt ${event.number}: ${status} (${event.durationMS}ms)${issues}`);
+      },
+    },
+  );
+}
+
+async function analyzeStrong() {
+  console.log("--- Strong model ---");
+  return enforce(
+    AnalysisSchema,
+    async (attempt) => simulateStrongModel(attempt.number),
+    {
+      invariants: [
+        (d: Analysis) =>
+          d.risks.length > 0 || d.recommendation === "approve"
+            || "non-approve recommendation must cite at least one risk",
+      ],
+      onAttempt: (event) => {
+        const status = event.ok ? "PASS" : `FAIL — ${event.category}`;
+        const issues = event.issues.length > 0 ? `\n    ${event.issues.join("\n    ")}` : "";
+        console.log(`  Attempt ${event.number}: ${status} (${event.durationMS}ms)${issues}`);
+      },
+    },
+  );
+}
+
 async function main() {
-  console.log("Trying cheap model...");
   const cheapResult = await analyzeCheap();
 
   if (cheapResult.ok) {
-    console.log("Cheap model succeeded:", cheapResult.data);
+    console.log("\nCheap model succeeded:");
+    console.log(`  Recommendation: ${cheapResult.data.recommendation}`);
     return;
   }
 
-  console.log("Cheap model failed, escalating to strong model...");
+  console.log("\nCheap model exhausted — escalating to strong model\n");
   const strongResult = await analyzeStrong();
 
+  console.log();
   if (strongResult.ok) {
-    console.log("Recommendation:", strongResult.data.recommendation);
-    console.log("Risks:", strongResult.data.risks);
+    console.log(`Recommendation: ${strongResult.data.recommendation}`);
+    console.log(`Risks: ${strongResult.data.risks.length}`);
+    strongResult.data.risks.forEach((r) => console.log(`  - ${r}`));
+    console.log(`Attempts (strong): ${strongResult.attempts}`);
   } else {
     console.error("Both models failed:", strongResult.error.message);
   }

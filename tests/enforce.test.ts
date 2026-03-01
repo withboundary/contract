@@ -283,6 +283,41 @@ describe("enforce", () => {
     expect(receivedPrompt).toContain("sentiment");
   });
 
+  it("appends promptSuffix to attempt.prompt", async () => {
+    let receivedPrompt = "";
+
+    await enforce(Schema, async (attempt) => {
+      receivedPrompt = attempt.prompt;
+      return '{"sentiment": "positive", "confidence": 0.9}';
+    }, {
+      promptSuffix: "If an optional field is unknown, omit it.",
+    });
+
+    expect(receivedPrompt).toContain("sentiment");
+    expect(receivedPrompt).toContain("If an optional field is unknown, omit it.");
+  });
+
+  it("does not modify prompt when promptSuffix is not provided", async () => {
+    let promptWithout = "";
+    let promptWith = "";
+
+    await enforce(Schema, async (attempt) => {
+      promptWithout = attempt.prompt;
+      return '{"sentiment": "positive", "confidence": 0.9}';
+    });
+
+    await enforce(Schema, async (attempt) => {
+      promptWith = attempt.prompt;
+      return '{"sentiment": "positive", "confidence": 0.9}';
+    }, {
+      promptSuffix: "Extra instruction.",
+    });
+
+    expect(promptWith).toContain(promptWithout);
+    expect(promptWith).toContain("Extra instruction.");
+    expect(promptWithout).not.toContain("Extra instruction.");
+  });
+
   it("coerces string types during clean", async () => {
     const result = await enforce(Schema, async () => {
       return '{"sentiment": "positive", "confidence": "0.85"}';

@@ -36,9 +36,10 @@ function enforce<T>(
 | `maxAttempts` | `number` | `3` | Maximum number of attempts |
 | `backoff` | `"none" \| "linear" \| "exponential"` | `"none"` | Delay strategy between retries |
 | `backoffBaseMS` | `number` | `200` | Base delay in milliseconds |
-| `invariants` | `Array<(data: T) => true \| string>` | `[]` | Custom validation rules beyond the schema |
+| `invariants` | `Array<(data: T) => true \| string>` | `[]` | Schema constraints Zod can't express (cross-field checks, conditional rules) |
 | `onAttempt` | `(event: AttemptEvent) => void` | — | Hook called after each attempt |
 | `repairs` | `Partial<Record<FailureCategory, RepairFn \| false>>` | — | Override or disable repair for specific failure categories |
+| `promptSuffix` | `string` | — | Appended to the auto-generated schema prompt. Use for domain-specific instructions without replacing the defaults |
 
 **Result:**
 

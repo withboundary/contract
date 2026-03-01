@@ -93,7 +93,7 @@ function defaultRepair(detail: AttemptDetail): Message[] {
         {
           role: "user",
           content: [
-            "Your response passed schema validation but failed business rules:",
+            "Your response had valid types but violated schema constraints:",
             issueList,
             "Please correct these issues and respond with valid JSON only.",
           ].join("\n"),

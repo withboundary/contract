@@ -27,7 +27,10 @@ export async function enforce<T>(
     backoffBaseMS: options?.backoffBaseMS,
   });
 
-  const schemaPrompt = generatePrompt(schema);
+  let schemaPrompt = generatePrompt(schema);
+  if (options?.promptSuffix) {
+    schemaPrompt = `${schemaPrompt}\n\n${options.promptSuffix}`;
+  }
   const attemptDetails: AttemptDetail[] = [];
   let currentFixes: AttemptContext["fixes"] = [];
   let previousError: AttemptContext["previousError"] = undefined;

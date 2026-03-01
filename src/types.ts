@@ -44,6 +44,7 @@ export interface EnforceOptions<T = unknown> {
   invariants?: Invariant<T>[];
   onAttempt?: AttemptHook;
   repairs?: Partial<Record<FailureCategory, RepairFn | false>>;
+  promptSuffix?: string;
 }
 
 export interface AttemptEvent {

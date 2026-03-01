@@ -94,7 +94,7 @@ describe("fix", () => {
     };
 
     const messages = asMessages(fix(detail));
-    expect(messages[0].content).toContain("business rules");
+    expect(messages[0].content).toContain("schema constraints");
     expect(messages[0].content).toContain("total must be >= subtotal");
   });
 
