@@ -1,18 +1,18 @@
 # llm-contract
 
-Turn LLM output into a contract-bound API response.
+Validate, repair, and retry structured LLM output — automatically.
 
-Define a schema. Call any model. Get validated, typed data — or a precise, repairable error.
+Define a Zod schema. Call any model. Get typed data back, or a precise error with the exact violation. When the model returns bad structure, `llm-contract` feeds the specific failure back and retries — no manual prompt tweaking, no blind retries.
 
 No framework. No provider lock-in. One dependency (`zod`).
 
 ## The problem
 
-LLM calls in most codebases look like this: hand-written format instructions, `JSON.parse`, unchecked `as` casts, blind retries, inconsistent glue in every file. When the model returns bad structure, you find out downstream — or in production.
+LLM calls in most codebases look like this: hand-written format instructions, `JSON.parse`, unchecked `as` casts, blind retries, inconsistent glue in every file. When the model returns bad structure — wrong types, missing fields, invalid ranges — you find out downstream. Or in production.
 
 ## What this does
 
-`llm-contract` enforces a deterministic boundary around structured LLM output:
+`llm-contract` wraps your existing LLM call with a deterministic contract:
 
 1. Generate structural instructions from your schema
 2. Call your model (any provider, any SDK)
@@ -60,21 +60,16 @@ if (result.ok) {
 - `result.data` — typed, validated at runtime, no casts
 - Markdown fences, prose wrapping, string-typed numbers — cleaned automatically
 - 3 retries by default, zero config
-- `promptSuffix` — append domain-specific instructions without replacing the defaults
 
 ## What makes this different
 
 This is not `JSON.parse` + Zod. This is not "try again" retries.
 
-On failure, the exact violated constraint is fed back to the model. Not:
-
-> "Return valid JSON."
-
-But:
+On failure, the exact violated constraint is fed back to the model. Not "return valid JSON" — but the specific issue:
 
 > `confidence must be between 0 and 1, received 1.4`
 
-LLMs respond far better to targeted constraint feedback than to generic instructions. You don't improve the model. You improve the boundary.
+LLMs correct far more reliably with targeted feedback than with generic instructions. The model doesn't change. The boundary gets smarter.
 
 ## How it works
 
@@ -84,9 +79,16 @@ prompt → [your LLM call] → clean → check
                               └─ fix ←┘  (on failure)
 ```
 
-`prompt` generates structural instructions from the schema. `clean` normalizes raw output into JSON (strips markdown fences, prose wrapping, coerces string-typed numbers). `check` validates against the full schema contract — types, fields, enums, and invariants. `fix` turns failures into targeted repair messages. `enforce` runs the full loop.
+Each step is an independent function you can use on its own:
 
-Also available: `select` strips input down to only the fields the schema defines — prevents sending PII, secrets, or unrelated data to the model.
+- **`prompt`** — generates format instructions from the schema
+- **`clean`** — normalizes raw output into JSON (strips markdown fences, coerces types)
+- **`check`** — validates against the schema and invariants
+- **`fix`** — turns failures into targeted repair messages
+- **`select`** — strips input to only the fields the schema defines (no PII, secrets, or unrelated data sent to the model)
+- **`classify`** — categorizes failures into 8 types (empty, refusal, truncated, etc.)
+
+`enforce` runs the full loop. Or drop any primitive into an existing pipeline.
 
 ## Invariants
 
@@ -113,6 +115,27 @@ You don't design them up front. You discover them from production failures:
 4. Add one invariant. That structural failure is now caught and repaired automatically.
 
 Each invariant tightens the schema contract. Strictness compounds.
+
+### What each invariant gives you
+
+A single invariant does three things at once:
+
+1. **A runtime guard** — catches the specific violation on every response
+2. **A repair directive** — the violation string becomes the exact feedback to the model
+3. **A named error class** — tags the failure so you can observe and track it
+
+That third part matters. The moment you add an invariant, you've named a failure mode. It goes from "sometimes the output is wrong" to "`end-before-start` fired 47 times this week." You can count it, track it over time, and measure whether a prompt change or model upgrade actually reduced it.
+
+```typescript
+onAttempt: (event) => {
+  if (!event.ok) {
+    // event.category — "INVARIANT_ERROR", "VALIDATION_ERROR", etc.
+    // event.issues — ["end must be after start"]
+    // event.number — which attempt
+    // event.durationMS — how long it took
+  }
+}
+```
 
 ### How invariant repair works
 
@@ -144,6 +167,16 @@ The invariant fires. The model receives:
 ```
 
 Passes. No generic "try again" — the model knew exactly what to fix.
+
+### Works alongside prompt engineering
+
+Invariants don't replace prompt engineering, provider structured output modes, or model upgrades. They work alongside all of them.
+
+The difference: prompt changes are global — fixing one structural issue can destabilize other fields. A model upgrade might fix an issue, or might not. Provider features help, but don't cover cross-field logic.
+
+An invariant is a guaranteed fix for a specific error. If the issue still occurs after a prompt change or model upgrade, the invariant catches it, repairs it automatically, and it never reaches production. If the issue stops occurring, the invariant costs nothing — it doesn't fire.
+
+Because every attempt is logged, you get real signal: which invariants still fire, which went silent after a prompt change, which appeared after a model upgrade. You go from "I think the prompt is better" to knowing exactly what changed.
 
 ## Built-in failure handling
 
@@ -178,16 +211,15 @@ enforce(schema, run, {
 
 ## When to use this
 
-Use `llm-contract` when:
+Use `llm-contract` when LLM output feeds downstream logic and bad structure has cost:
 
-- LLM output feeds downstream logic
-- Incorrect structure has cost (data pipelines, APIs, automation)
-- You need explicit, repairable failures — not silent bad data
+- Classification and routing
+- Extraction (forms, invoices, entities)
+- Scoring and normalization
+- Moderation and policy labeling
+- Any automation step where the output must be valid before it moves forward
 
-Not designed for:
-
-- Free-form chat or creative writing
-- Tasks where structure doesn't matter
+Not designed for free-form chat, creative writing, or tasks where structure doesn't matter.
 
 ## Install
 
