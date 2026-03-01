@@ -170,6 +170,15 @@ npm install llm-contract zod
 - [Examples](./examples) — runnable demos (extraction, moderation, classification, scoring, fallback, primitives)
 - [EXAMPLES.md](./EXAMPLES.md) — detailed before/after comparisons
 
+## Status
+
+Preview release.
+
+The core contract loop (schema → validate → targeted repair → retry) is stable.
+APIs may evolve as real-world failure patterns are discovered.
+
+This library is intentionally small and opinionated. The goal is correctness at the boundary, not feature breadth.
+
 ## License
 
 MIT
