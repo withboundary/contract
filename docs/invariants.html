@@ -1,0 +1,270 @@
+<!DOCTYPE html>
+<html lang="en" class="scroll-smooth">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Invariants — llm-contract</title>
+  <meta name="description" content="Invariants are schema rules Zod can't express. Learn how to write them, how repair works, and how they compound correctness over time.">
+  <script src="https://cdn.tailwindcss.com"></script>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet">
+  <link href="https://cdnjs.cloudflare.com/ajax/libs/prism/1.29.0/themes/prism-tomorrow.min.css" rel="stylesheet">
+  <script>
+    tailwind.config = {
+      theme: {
+        extend: {
+          fontFamily: { sans: ['Inter', 'sans-serif'], mono: ['JetBrains Mono', 'monospace'] },
+          colors: {
+            bg: '#09090b',
+            surface: '#18181b',
+            border: '#27272a',
+            accent: '#a78bfa',
+            'accent-blue': '#60a5fa',
+            muted: '#a1a1aa',
+          }
+        }
+      }
+    }
+  </script>
+  <style>
+    pre[class*="language-"] { margin: 0; border-radius: 0.75rem; background: #18181b !important; border: 1px solid #27272a; }
+    code[class*="language-"] { font-family: 'JetBrains Mono', monospace; font-size: 0.8125rem; }
+    .gradient-text { background: linear-gradient(135deg, #a78bfa 0%, #60a5fa 50%, #a78bfa 100%); -webkit-background-clip: text; -webkit-text-fill-color: transparent; background-clip: text; }
+    .gradient-border { position: relative; background: #18181b; border-radius: 0.75rem; }
+    .gradient-border::before { content: ''; position: absolute; inset: -1px; border-radius: inherit; padding: 1px; background: linear-gradient(135deg, #a78bfa, #60a5fa); -webkit-mask: linear-gradient(#fff 0 0) content-box, linear-gradient(#fff 0 0); -webkit-mask-composite: xor; mask-composite: exclude; pointer-events: none; }
+    .glass { background: rgba(24, 24, 27, 0.6); backdrop-filter: blur(12px); -webkit-backdrop-filter: blur(12px); border: 1px solid rgba(39, 39, 42, 0.8); }
+    .card-hover { transition: transform 0.2s ease, border-color 0.2s ease, box-shadow 0.2s ease; }
+    .card-hover:hover { transform: translateY(-2px); border-color: rgba(167, 139, 250, 0.3); box-shadow: 0 4px 24px rgba(167, 139, 250, 0.06); }
+    @keyframes fadeUp { from { opacity: 0; transform: translateY(20px); } to { opacity: 1; transform: translateY(0); } }
+    .fade-up { opacity: 0; }
+    .fade-up.visible { animation: fadeUp 0.6s ease-out forwards; }
+  </style>
+</head>
+<body class="bg-bg text-zinc-300 font-sans antialiased">
+
+  <nav class="sticky top-0 z-50 bg-bg/70 backdrop-blur-xl border-b border-white/[0.06]">
+    <div class="max-w-6xl mx-auto px-6 h-14 flex items-center justify-between">
+      <a href="index.html" class="font-bold text-lg gradient-text">llm-contract</a>
+      <div class="flex items-center gap-6 text-sm text-zinc-500">
+        <a href="index.html#repairs" class="hover:text-zinc-200 transition">Repairs</a>
+        <a href="primitives.html" class="hover:text-zinc-200 transition">Primitives</a>
+        <a href="invariants.html" class="text-white">Invariants</a>
+        <a href="observability.html" class="hover:text-zinc-200 transition">Observability</a>
+        <a href="api.html" class="hover:text-zinc-200 transition">API</a>
+        <a href="examples.html" class="hover:text-zinc-200 transition">Examples</a>
+        <a href="https://github.com/operatorstack/llm-contract" class="hover:text-zinc-200 transition" target="_blank">GitHub</a>
+      </div>
+    </div>
+  </nav>
+
+  <section class="max-w-6xl mx-auto px-6 pt-24 pb-12">
+    <h1 class="text-3xl sm:text-4xl font-extrabold text-white mb-4 tracking-tight"><span class="gradient-text">Invariants</span></h1>
+    <p class="text-zinc-400 text-lg max-w-3xl">
+      Schema rules that Zod can't express — cross-field checks, conditional requirements, numeric consistency. Each invariant you add tightens the contract and compounds correctness.
+    </p>
+  </section>
+
+  <section class="max-w-6xl mx-auto px-6 py-14 border-t border-white/[0.06] fade-up">
+    <h2 class="text-2xl font-bold text-white mb-6 tracking-tight">What are invariants</h2>
+    <p class="text-zinc-400 max-w-3xl mb-6">
+      Zod validates types, fields, and enums. Invariants validate the <em class="text-zinc-300">relationships</em> between them. They're functions that run on the parsed, typed data and return <code class="text-zinc-300 bg-surface px-1 py-0.5 rounded text-sm border border-border">true</code> if it passes, or a string describing the violation.
+    </p>
+    <p class="text-zinc-400 max-w-3xl mb-6">
+      That string matters — it becomes the exact feedback the model receives on retry.
+    </p>
+    <div class="glass rounded-xl p-5">
+      <pre><code class="language-typescript">invariants: [
+  (data) => data.items.length > 0 || "items must not be empty",
+  (data) => data.end > data.start || "end must be after start",
+  (data) => allowedRegions.includes(data.region)
+    || `region ${data.region} not in allowed list`,
+]</code></pre>
+    </div>
+    <p class="text-zinc-500 text-sm mt-4">Each invariant is a function on the parsed data — no external dependencies, no side effects.</p>
+  </section>
+
+  <section class="max-w-6xl mx-auto px-6 py-14 border-t border-white/[0.06] fade-up">
+    <h2 class="text-2xl font-bold text-white mb-6 tracking-tight">How to write them</h2>
+    <p class="text-zinc-400 max-w-3xl mb-6">
+      An invariant is a function that takes the fully parsed, typed data and returns <code class="text-zinc-300 bg-surface px-1 py-0.5 rounded text-sm border border-border">true</code> or a violation string. Keep them simple and focused — one check per invariant.
+    </p>
+    <div class="grid md:grid-cols-2 gap-4">
+      <div class="glass rounded-xl p-5 card-hover">
+        <p class="text-xs text-accent uppercase tracking-wider mb-3 font-medium">Date ordering</p>
+        <pre><code class="language-typescript">(d) => d.end > d.start
+  || "end must be after start"</code></pre>
+      </div>
+      <div class="glass rounded-xl p-5 card-hover">
+        <p class="text-xs text-accent uppercase tracking-wider mb-3 font-medium">Math consistency</p>
+        <pre><code class="language-typescript">(d) => Math.abs(d.subtotal + d.tax - d.total) < 0.01
+  || `subtotal + tax != total`</code></pre>
+      </div>
+      <div class="glass rounded-xl p-5 card-hover">
+        <p class="text-xs text-accent uppercase tracking-wider mb-3 font-medium">Conditional requirement</p>
+        <pre><code class="language-typescript">(d) => d.action !== "block" || d.confidence > 0.7
+  || "can't block with low confidence"</code></pre>
+      </div>
+      <div class="glass rounded-xl p-5 card-hover">
+        <p class="text-xs text-accent uppercase tracking-wider mb-3 font-medium">Non-empty collection</p>
+        <pre><code class="language-typescript">(d) => d.tags.length > 0
+  || "must have at least one tag"</code></pre>
+      </div>
+    </div>
+  </section>
+
+  <section class="max-w-6xl mx-auto px-6 py-14 border-t border-white/[0.06] fade-up">
+    <h2 class="text-2xl font-bold text-white mb-6 tracking-tight">How invariant repair works</h2>
+    <p class="text-zinc-400 max-w-3xl mb-8">
+      When an invariant fails, the exact violation string becomes the repair message. The model gets targeted constraint feedback instead of generic "try again."
+    </p>
+
+    <div class="space-y-6 max-w-3xl">
+      <div class="glass rounded-xl p-5">
+        <p class="text-xs text-accent uppercase tracking-wider mb-3 font-medium">Invariant</p>
+        <pre><code class="language-typescript">(data) => data.end > data.start || "end must be after start"</code></pre>
+      </div>
+
+      <div class="glass rounded-xl p-5" style="border-color: rgba(239,68,68,0.2)">
+        <div class="flex items-center gap-2 mb-3">
+          <span class="text-xs font-mono text-red-400 bg-red-500/10 px-2 py-0.5 rounded">Attempt 1 — FAIL</span>
+        </div>
+        <p class="text-sm text-zinc-500 mb-3">The model returns:</p>
+        <pre><code class="language-json">{ "start": "2024-03-15", "end": "2024-03-10" }</code></pre>
+        <p class="text-sm text-zinc-500 mt-4 mb-3">The invariant fires. The model receives:</p>
+        <div class="bg-bg/60 rounded-lg p-4 border border-white/[0.04]">
+          <p class="text-sm font-mono text-red-400">Your response had valid types but violated schema constraints:</p>
+          <p class="text-sm font-mono text-red-400">- end must be after start</p>
+          <p class="text-sm font-mono text-zinc-600 mt-2">Please correct these issues and respond with valid JSON only.</p>
+        </div>
+      </div>
+
+      <div class="glass rounded-xl p-5" style="border-color: rgba(74,222,128,0.2)">
+        <div class="flex items-center gap-2 mb-3">
+          <span class="text-xs font-mono text-green-400 bg-green-500/10 px-2 py-0.5 rounded">Attempt 2 — PASS</span>
+        </div>
+        <p class="text-sm text-zinc-500 mb-3">The model returns:</p>
+        <pre><code class="language-json">{ "start": "2024-03-15", "end": "2024-03-20" }</code></pre>
+        <p class="text-sm text-zinc-500 mt-3">No generic "try again" — the model knew exactly what to fix.</p>
+      </div>
+    </div>
+  </section>
+
+  <section class="max-w-6xl mx-auto px-6 py-14 border-t border-white/[0.06] fade-up">
+    <h2 class="text-2xl font-bold text-white mb-6 tracking-tight">What each invariant gives you</h2>
+    <p class="text-zinc-400 max-w-3xl mb-8">A single invariant does three things at once:</p>
+
+    <div class="grid md:grid-cols-3 gap-4 mb-8">
+      <div class="glass rounded-xl p-6 card-hover">
+        <div class="gradient-text font-mono text-sm mb-3 font-semibold">1</div>
+        <h3 class="text-white font-medium mb-2">A runtime guard</h3>
+        <p class="text-zinc-500 text-sm">Catches the specific violation on every response, every time.</p>
+      </div>
+      <div class="glass rounded-xl p-6 card-hover">
+        <div class="gradient-text font-mono text-sm mb-3 font-semibold">2</div>
+        <h3 class="text-white font-medium mb-2">A repair directive</h3>
+        <p class="text-zinc-500 text-sm">The violation string becomes the exact feedback to the model.</p>
+      </div>
+      <div class="glass rounded-xl p-6 card-hover">
+        <div class="gradient-text font-mono text-sm mb-3 font-semibold">3</div>
+        <h3 class="text-white font-medium mb-2">A named error class</h3>
+        <p class="text-zinc-500 text-sm">Tags the failure so you can observe and track it over time.</p>
+      </div>
+    </div>
+
+    <p class="text-zinc-400 max-w-3xl mb-6">
+      That third part matters. The moment you add an invariant, you've named a failure mode. It goes from "sometimes the output is wrong" to "<code class="text-zinc-300 bg-surface px-1 py-0.5 rounded text-sm border border-border">end-before-start</code> fired 47 times this week." You can count it, track it over time, and measure whether a prompt change or model upgrade actually reduced it.
+    </p>
+
+    <div class="glass rounded-xl p-5">
+      <pre><code class="language-typescript">onAttempt: (event) => {
+  if (!event.ok) {
+    // event.category  — "INVARIANT_ERROR", "VALIDATION_ERROR", etc.
+    // event.issues    — ["end must be after start"]
+    // event.number    — which attempt
+    // event.durationMS — how long it took
+  }
+}</code></pre>
+    </div>
+  </section>
+
+  <section class="max-w-6xl mx-auto px-6 py-14 border-t border-white/[0.06] fade-up">
+    <h2 class="text-2xl font-bold text-white mb-6 tracking-tight">Discovery workflow</h2>
+    <p class="text-zinc-400 max-w-3xl mb-8">
+      You don't design invariants up front. You discover them from production failures.
+    </p>
+
+    <div class="space-y-4 max-w-3xl">
+      <div class="flex gap-4 items-start">
+        <span class="flex-shrink-0 w-8 h-8 rounded-full bg-accent/10 text-accent text-sm font-mono flex items-center justify-center border border-accent/20">1</span>
+        <div>
+          <p class="text-white font-medium">Ship with the schema</p>
+          <p class="text-zinc-500 text-sm mt-1">Start with just Zod validation. No invariants needed yet.</p>
+        </div>
+      </div>
+      <div class="flex gap-4 items-start">
+        <span class="flex-shrink-0 w-8 h-8 rounded-full bg-accent/10 text-accent text-sm font-mono flex items-center justify-center border border-accent/20">2</span>
+        <div>
+          <p class="text-white font-medium">Observe failures via <code class="text-zinc-300 bg-surface px-1 py-0.5 rounded text-sm border border-border">onAttempt</code></p>
+          <p class="text-zinc-500 text-sm mt-1">Watch what passes schema validation but still isn't right.</p>
+        </div>
+      </div>
+      <div class="flex gap-4 items-start">
+        <span class="flex-shrink-0 w-8 h-8 rounded-full bg-accent/10 text-accent text-sm font-mono flex items-center justify-center border border-accent/20">3</span>
+        <div>
+          <p class="text-white font-medium">Notice a pattern</p>
+          <p class="text-zinc-500 text-sm mt-1">A field relationship the schema can't enforce — dates reversed, math not adding up, conflicting values.</p>
+        </div>
+      </div>
+      <div class="flex gap-4 items-start">
+        <span class="flex-shrink-0 w-8 h-8 rounded-full bg-accent/10 text-accent text-sm font-mono flex items-center justify-center border border-accent/20">4</span>
+        <div>
+          <p class="text-white font-medium">Add one invariant</p>
+          <p class="text-zinc-500 text-sm mt-1">That structural failure is now caught and repaired automatically.</p>
+        </div>
+      </div>
+    </div>
+
+    <p class="text-white font-semibold mt-8 max-w-3xl">Each invariant tightens the schema contract. Strictness compounds.</p>
+  </section>
+
+  <section class="max-w-6xl mx-auto px-6 py-14 border-t border-white/[0.06] fade-up">
+    <h2 class="text-2xl font-bold text-white mb-6 tracking-tight">Works alongside prompt engineering</h2>
+    <p class="text-zinc-400 max-w-3xl mb-6">
+      Invariants don't replace prompt engineering, provider structured output modes, or model upgrades. They work alongside all of them.
+    </p>
+    <p class="text-zinc-400 max-w-3xl mb-6">
+      The difference: prompt changes are global — fixing one structural issue can destabilize other fields. A model upgrade might fix an issue, or might not. Provider features help, but don't cover cross-field logic.
+    </p>
+    <p class="text-zinc-400 max-w-3xl mb-6">
+      An invariant is a guaranteed fix for a specific error. If the issue still occurs after a prompt change or model upgrade, the invariant catches it, repairs it automatically, and it never reaches production. If the issue stops occurring, the invariant costs nothing — it doesn't fire.
+    </p>
+
+    <div class="gradient-border p-6 max-w-3xl">
+      <p class="text-white font-semibold mb-3">Real signal, not vibes</p>
+      <p class="text-zinc-500 text-sm">
+        Because every attempt is logged, you get real data: which invariants still fire, which went silent after a prompt change, which appeared after a model upgrade. You go from "I think the prompt is better" to knowing exactly what changed.
+      </p>
+    </div>
+  </section>
+
+  <footer class="border-t border-white/[0.06] mt-8">
+    <div class="max-w-6xl mx-auto px-6 py-8 flex flex-col sm:flex-row items-center justify-between gap-4 text-sm text-zinc-600">
+      <span>llm-contract &middot; MIT License &middot; Preview release</span>
+      <div class="flex gap-6">
+        <a href="https://github.com/operatorstack/llm-contract" class="hover:text-zinc-300 transition" target="_blank">GitHub</a>
+        <a href="https://www.npmjs.com/package/llm-contract" class="hover:text-zinc-300 transition" target="_blank">npm</a>
+      </div>
+    </div>
+  </footer>
+
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/prism/1.29.0/prism.min.js"></script>
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/prism/1.29.0/components/prism-typescript.min.js"></script>
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/prism/1.29.0/components/prism-json.min.js"></script>
+  <script>
+    const observer = new IntersectionObserver((entries) => {
+      entries.forEach(entry => { if (entry.isIntersecting) { entry.target.classList.add('visible'); observer.unobserve(entry.target); } });
+    }, { threshold: 0.1 });
+    document.querySelectorAll('.fade-up').forEach(el => observer.observe(el));
+  </script>
+</body>
+</html>

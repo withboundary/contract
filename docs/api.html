@@ -1,0 +1,226 @@
+<!DOCTYPE html>
+<html lang="en" class="scroll-smooth">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>API Reference — llm-contract</title>
+  <meta name="description" content="Full API reference for llm-contract: enforce, clean, check, fix, select, classify, prompt.">
+  <script src="https://cdn.tailwindcss.com"></script>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet">
+  <link href="https://cdnjs.cloudflare.com/ajax/libs/prism/1.29.0/themes/prism-tomorrow.min.css" rel="stylesheet">
+  <script>
+    tailwind.config = {
+      theme: {
+        extend: {
+          fontFamily: { sans: ['Inter', 'sans-serif'], mono: ['JetBrains Mono', 'monospace'] },
+          colors: {
+            bg: '#09090b',
+            surface: '#18181b',
+            border: '#27272a',
+            accent: '#a78bfa',
+            'accent-blue': '#60a5fa',
+            muted: '#a1a1aa',
+          }
+        }
+      }
+    }
+  </script>
+  <style>
+    pre[class*="language-"] { margin: 0; border-radius: 0.75rem; background: #18181b !important; border: 1px solid #27272a; }
+    code[class*="language-"] { font-family: 'JetBrains Mono', monospace; font-size: 0.8125rem; }
+    .gradient-text { background: linear-gradient(135deg, #a78bfa 0%, #60a5fa 50%, #a78bfa 100%); -webkit-background-clip: text; -webkit-text-fill-color: transparent; background-clip: text; }
+    .glass { background: rgba(24, 24, 27, 0.6); backdrop-filter: blur(12px); -webkit-backdrop-filter: blur(12px); border: 1px solid rgba(39, 39, 42, 0.8); }
+    .card-hover { transition: transform 0.2s ease, border-color 0.2s ease, box-shadow 0.2s ease; }
+    .card-hover:hover { transform: translateY(-2px); border-color: rgba(167, 139, 250, 0.3); box-shadow: 0 4px 24px rgba(167, 139, 250, 0.06); }
+    @keyframes fadeUp { from { opacity: 0; transform: translateY(20px); } to { opacity: 1; transform: translateY(0); } }
+    .fade-up { opacity: 0; }
+    .fade-up.visible { animation: fadeUp 0.6s ease-out forwards; }
+  </style>
+</head>
+<body class="bg-bg text-zinc-300 font-sans antialiased">
+
+  <nav class="sticky top-0 z-50 bg-bg/70 backdrop-blur-xl border-b border-white/[0.06]">
+    <div class="max-w-6xl mx-auto px-6 h-14 flex items-center justify-between">
+      <a href="index.html" class="font-bold text-lg gradient-text">llm-contract</a>
+      <div class="flex items-center gap-6 text-sm text-zinc-500">
+        <a href="index.html#repairs" class="hover:text-zinc-200 transition">Repairs</a>
+        <a href="primitives.html" class="hover:text-zinc-200 transition">Primitives</a>
+        <a href="invariants.html" class="hover:text-zinc-200 transition">Invariants</a>
+        <a href="observability.html" class="hover:text-zinc-200 transition">Observability</a>
+        <a href="api.html" class="text-white">API</a>
+        <a href="examples.html" class="hover:text-zinc-200 transition">Examples</a>
+        <a href="https://github.com/operatorstack/llm-contract" class="hover:text-zinc-200 transition" target="_blank">GitHub</a>
+      </div>
+    </div>
+  </nav>
+
+  <section class="max-w-6xl mx-auto px-6 pt-24 pb-12">
+    <h1 class="text-3xl sm:text-4xl font-extrabold text-white mb-4 tracking-tight"><span class="gradient-text">API Reference</span></h1>
+    <p class="text-zinc-400 text-lg max-w-3xl">Full function signatures, parameters, and return types.</p>
+    <div class="flex flex-wrap gap-3 mt-6 text-sm">
+      <a href="#enforce" class="glass rounded-lg px-3 py-1.5 text-accent card-hover font-mono text-xs">enforce</a>
+      <a href="#clean" class="glass rounded-lg px-3 py-1.5 text-accent card-hover font-mono text-xs">clean</a>
+      <a href="#check" class="glass rounded-lg px-3 py-1.5 text-accent card-hover font-mono text-xs">check</a>
+      <a href="#fix" class="glass rounded-lg px-3 py-1.5 text-accent card-hover font-mono text-xs">fix</a>
+      <a href="#select" class="glass rounded-lg px-3 py-1.5 text-accent card-hover font-mono text-xs">select</a>
+      <a href="#prompt" class="glass rounded-lg px-3 py-1.5 text-accent card-hover font-mono text-xs">prompt</a>
+      <a href="#classify" class="glass rounded-lg px-3 py-1.5 text-accent card-hover font-mono text-xs">classify</a>
+    </div>
+  </section>
+
+  <section id="enforce" class="max-w-6xl mx-auto px-6 py-14 border-t border-white/[0.06] fade-up">
+    <h2 class="text-2xl font-bold text-white mb-2 tracking-tight">enforce</h2>
+    <p class="text-zinc-400 mb-6">The full contract loop. Runs your function, cleans the output, validates against the schema, retries with targeted repair on failure.</p>
+    <div class="glass rounded-xl p-5 mb-6">
+      <pre><code class="language-typescript">function enforce&lt;T&gt;(
+  schema: ZodType&lt;T&gt;,
+  run: (attempt: AttemptContext) =&gt; Promise&lt;string | null&gt;,
+  options?: EnforceOptions&lt;T&gt;,
+): Promise&lt;Result&lt;T&gt;&gt;</code></pre>
+    </div>
+
+    <h3 class="text-lg font-semibold text-white mb-3">Parameters</h3>
+    <div class="overflow-x-auto mb-6">
+      <table class="w-full text-sm">
+        <thead><tr class="border-b border-white/[0.08] text-left"><th class="py-3 pr-6 text-white font-medium">Param</th><th class="py-3 pr-6 text-white font-medium">Type</th><th class="py-3 text-white font-medium">Description</th></tr></thead>
+        <tbody class="text-zinc-400">
+          <tr class="border-b border-white/[0.04]"><td class="py-3 pr-6 font-mono text-xs text-accent">schema</td><td class="py-3 pr-6 font-mono text-xs">ZodType&lt;T&gt;</td><td class="py-3">Zod schema defining the expected output shape</td></tr>
+          <tr class="border-b border-white/[0.04]"><td class="py-3 pr-6 font-mono text-xs text-accent">run</td><td class="py-3 pr-6 font-mono text-xs">(attempt) =&gt; Promise&lt;string | null&gt;</td><td class="py-3">Your LLM call. Receives attempt context, returns raw output</td></tr>
+          <tr><td class="py-3 pr-6 font-mono text-xs text-accent">options</td><td class="py-3 pr-6 font-mono text-xs">EnforceOptions&lt;T&gt;</td><td class="py-3">Optional config (see below)</td></tr>
+        </tbody>
+      </table>
+    </div>
+
+    <h3 class="text-lg font-semibold text-white mb-3">AttemptContext</h3>
+    <p class="text-zinc-500 text-sm mb-3">Passed to your <code class="text-zinc-300 bg-surface px-1 py-0.5 rounded text-xs border border-border">run</code> function:</p>
+    <div class="overflow-x-auto mb-6">
+      <table class="w-full text-sm">
+        <thead><tr class="border-b border-white/[0.08] text-left"><th class="py-3 pr-6 text-white font-medium">Field</th><th class="py-3 pr-6 text-white font-medium">Type</th><th class="py-3 text-white font-medium">Description</th></tr></thead>
+        <tbody class="text-zinc-400">
+          <tr class="border-b border-white/[0.04]"><td class="py-3 pr-6 font-mono text-xs text-accent">prompt</td><td class="py-3 pr-6 font-mono text-xs">string</td><td class="py-3">Auto-generated prompt instructions from the schema</td></tr>
+          <tr class="border-b border-white/[0.04]"><td class="py-3 pr-6 font-mono text-xs text-accent">fixes</td><td class="py-3 pr-6 font-mono text-xs">Message[]</td><td class="py-3">Repair messages from previous failed attempt (empty on first try)</td></tr>
+          <tr class="border-b border-white/[0.04]"><td class="py-3 pr-6 font-mono text-xs text-accent">number</td><td class="py-3 pr-6 font-mono text-xs">number</td><td class="py-3">Current attempt number (1-indexed)</td></tr>
+          <tr><td class="py-3 pr-6 font-mono text-xs text-accent">previousError</td><td class="py-3 pr-6 font-mono text-xs">ContractError?</td><td class="py-3">Error details from the previous attempt</td></tr>
+        </tbody>
+      </table>
+    </div>
+
+    <h3 class="text-lg font-semibold text-white mb-3">EnforceOptions</h3>
+    <div class="overflow-x-auto mb-6">
+      <table class="w-full text-sm">
+        <thead><tr class="border-b border-white/[0.08] text-left"><th class="py-3 pr-4 text-white font-medium">Option</th><th class="py-3 pr-4 text-white font-medium">Type</th><th class="py-3 pr-4 text-white font-medium">Default</th><th class="py-3 text-white font-medium">Description</th></tr></thead>
+        <tbody class="text-zinc-400">
+          <tr class="border-b border-white/[0.04]"><td class="py-3 pr-4 font-mono text-xs text-accent">maxAttempts</td><td class="py-3 pr-4 font-mono text-xs">number</td><td class="py-3 pr-4 font-mono text-xs">3</td><td class="py-3">Maximum number of attempts</td></tr>
+          <tr class="border-b border-white/[0.04]"><td class="py-3 pr-4 font-mono text-xs text-accent">backoff</td><td class="py-3 pr-4 font-mono text-xs">"none" | "linear" | "exponential"</td><td class="py-3 pr-4 font-mono text-xs">"none"</td><td class="py-3">Delay strategy between retries</td></tr>
+          <tr class="border-b border-white/[0.04]"><td class="py-3 pr-4 font-mono text-xs text-accent">backoffBaseMS</td><td class="py-3 pr-4 font-mono text-xs">number</td><td class="py-3 pr-4 font-mono text-xs">200</td><td class="py-3">Base delay in milliseconds</td></tr>
+          <tr class="border-b border-white/[0.04]"><td class="py-3 pr-4 font-mono text-xs text-accent">invariants</td><td class="py-3 pr-4 font-mono text-xs">Array&lt;(data: T) =&gt; true | string&gt;</td><td class="py-3 pr-4 font-mono text-xs">[]</td><td class="py-3">Schema constraints Zod can't express</td></tr>
+          <tr class="border-b border-white/[0.04]"><td class="py-3 pr-4 font-mono text-xs text-accent">onAttempt</td><td class="py-3 pr-4 font-mono text-xs">(event: AttemptEvent) =&gt; void</td><td class="py-3 pr-4 font-mono text-xs">—</td><td class="py-3">Hook called after each attempt</td></tr>
+          <tr class="border-b border-white/[0.04]"><td class="py-3 pr-4 font-mono text-xs text-accent">repairs</td><td class="py-3 pr-4 font-mono text-xs">Partial&lt;Record&lt;...&gt;&gt;</td><td class="py-3 pr-4 font-mono text-xs">—</td><td class="py-3">Override or disable repair per category</td></tr>
+          <tr><td class="py-3 pr-4 font-mono text-xs text-accent">promptSuffix</td><td class="py-3 pr-4 font-mono text-xs">string</td><td class="py-3 pr-4 font-mono text-xs">—</td><td class="py-3">Appended to the auto-generated schema prompt</td></tr>
+        </tbody>
+      </table>
+    </div>
+
+    <h3 class="text-lg font-semibold text-white mb-3">Result</h3>
+    <div class="glass rounded-xl p-5">
+      <pre><code class="language-typescript">type Result&lt;T&gt; =
+  | { ok: true; data: T; attempts: number; raw: string; durationMS: number }
+  | { ok: false; error: ContractError }</code></pre>
+    </div>
+  </section>
+
+  <section id="clean" class="max-w-6xl mx-auto px-6 py-14 border-t border-white/[0.06] fade-up">
+    <h2 class="text-2xl font-bold text-white mb-2 tracking-tight">clean</h2>
+    <p class="text-zinc-400 mb-6">Normalizes raw LLM output into clean JSON.</p>
+    <div class="glass rounded-xl p-5 mb-4">
+      <pre><code class="language-typescript">function clean(raw: string | null | undefined): unknown</code></pre>
+    </div>
+    <p class="text-zinc-500 text-sm mb-3">Handles:</p>
+    <ul class="text-zinc-500 text-sm space-y-1 mb-4">
+      <li>Markdown fences (<code class="text-zinc-300 bg-surface px-1 py-0.5 rounded text-xs border border-border">```json</code>, <code class="text-zinc-300 bg-surface px-1 py-0.5 rounded text-xs border border-border">```JSON</code>, bare <code class="text-zinc-300 bg-surface px-1 py-0.5 rounded text-xs border border-border">```</code>)</li>
+      <li>Prose wrapping ("Here is the result: {...} Let me know!")</li>
+      <li>Type coercion (<code class="text-zinc-300 bg-surface px-1 py-0.5 rounded text-xs border border-border">"85"</code> &rarr; <code class="text-zinc-300 bg-surface px-1 py-0.5 rounded text-xs border border-border">85</code>, <code class="text-zinc-300 bg-surface px-1 py-0.5 rounded text-xs border border-border">"true"</code> &rarr; <code class="text-zinc-300 bg-surface px-1 py-0.5 rounded text-xs border border-border">true</code>)</li>
+      <li>Null/empty input</li>
+    </ul>
+  </section>
+
+  <section id="check" class="max-w-6xl mx-auto px-6 py-14 border-t border-white/[0.06] fade-up">
+    <h2 class="text-2xl font-bold text-white mb-2 tracking-tight">check</h2>
+    <p class="text-zinc-400 mb-6">Validates data against a Zod schema and optional invariants. Deterministic — no LLM involved.</p>
+    <div class="glass rounded-xl p-5">
+      <pre><code class="language-typescript">function check&lt;T&gt;(
+  data: unknown,
+  schema: ZodType&lt;T&gt;,
+  invariants?: Invariant&lt;T&gt;[],
+): Result&lt;T&gt;</code></pre>
+    </div>
+  </section>
+
+  <section id="fix" class="max-w-6xl mx-auto px-6 py-14 border-t border-white/[0.06] fade-up">
+    <h2 class="text-2xl font-bold text-white mb-2 tracking-tight">fix</h2>
+    <p class="text-zinc-400 mb-6">Turns validation failures into targeted repair messages for the next attempt.</p>
+    <div class="glass rounded-xl p-5">
+      <pre><code class="language-typescript">function fix(
+  detail: AttemptDetail,
+  repairs?: Partial&lt;Record&lt;FailureCategory, RepairFn | false&gt;&gt;,
+): Message[] | false</code></pre>
+    </div>
+  </section>
+
+  <section id="select" class="max-w-6xl mx-auto px-6 py-14 border-t border-white/[0.06] fade-up">
+    <h2 class="text-2xl font-bold text-white mb-2 tracking-tight">select</h2>
+    <p class="text-zinc-400 mb-6">Strips a state object down to only the fields the schema defines. Prevents sending PII, secrets, or unrelated data to the LLM.</p>
+    <div class="glass rounded-xl p-5">
+      <pre><code class="language-typescript">function select&lt;T&gt;(
+  state: Record&lt;string, unknown&gt;,
+  schema: ZodType&lt;T&gt;,
+): Record&lt;string, unknown&gt;</code></pre>
+    </div>
+  </section>
+
+  <section id="prompt" class="max-w-6xl mx-auto px-6 py-14 border-t border-white/[0.06] fade-up">
+    <h2 class="text-2xl font-bold text-white mb-2 tracking-tight">prompt</h2>
+    <p class="text-zinc-400 mb-6">Generates prompt instructions from a Zod schema. Used internally by <code class="text-zinc-300 bg-surface px-1 py-0.5 rounded text-sm border border-border">enforce</code>.</p>
+    <div class="glass rounded-xl p-5">
+      <pre><code class="language-typescript">function prompt(schema: ZodType): string</code></pre>
+    </div>
+  </section>
+
+  <section id="classify" class="max-w-6xl mx-auto px-6 py-14 border-t border-white/[0.06] fade-up">
+    <h2 class="text-2xl font-bold text-white mb-2 tracking-tight">classify</h2>
+    <p class="text-zinc-400 mb-6">Categorizes a failed LLM response into a <code class="text-zinc-300 bg-surface px-1 py-0.5 rounded text-sm border border-border">FailureCategory</code>.</p>
+    <div class="glass rounded-xl p-5">
+      <pre><code class="language-typescript">type FailureCategory =
+  | "EMPTY_RESPONSE"
+  | "REFUSAL"
+  | "NO_JSON"
+  | "TRUNCATED"
+  | "PARSE_ERROR"
+  | "VALIDATION_ERROR"
+  | "INVARIANT_ERROR"
+  | "RUN_ERROR"</code></pre>
+    </div>
+    <p class="text-zinc-500 text-sm mt-4">Used internally by <code class="text-zinc-300 bg-surface px-1 py-0.5 rounded text-sm border border-border">enforce</code>. Available for custom pipelines.</p>
+  </section>
+
+  <footer class="border-t border-white/[0.06] mt-8">
+    <div class="max-w-6xl mx-auto px-6 py-8 flex flex-col sm:flex-row items-center justify-between gap-4 text-sm text-zinc-600">
+      <span>llm-contract &middot; MIT License &middot; Preview release</span>
+      <div class="flex gap-6">
+        <a href="https://github.com/operatorstack/llm-contract" class="hover:text-zinc-300 transition" target="_blank">GitHub</a>
+        <a href="https://www.npmjs.com/package/llm-contract" class="hover:text-zinc-300 transition" target="_blank">npm</a>
+      </div>
+    </div>
+  </footer>
+
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/prism/1.29.0/prism.min.js"></script>
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/prism/1.29.0/components/prism-typescript.min.js"></script>
+  <script>
+    const observer = new IntersectionObserver((entries) => {
+      entries.forEach(entry => { if (entry.isIntersecting) { entry.target.classList.add('visible'); observer.unobserve(entry.target); } });
+    }, { threshold: 0.1 });
+    document.querySelectorAll('.fade-up').forEach(el => observer.observe(el));
+  </script>
+</body>
+</html>

@@ -1,0 +1,671 @@
+<!DOCTYPE html>
+<html lang="en" class="scroll-smooth">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>llm-contract — Turn LLM errors into permanent improvements</title>
+  <meta name="description" content="See a bad LLM output. Write one rule. That error is caught and self-corrected on every future call. Schema validation, targeted repair, bounded retries.">
+  <script src="https://cdn.tailwindcss.com"></script>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet">
+  <link href="https://cdnjs.cloudflare.com/ajax/libs/prism/1.29.0/themes/prism-tomorrow.min.css" rel="stylesheet">
+  <script>
+    tailwind.config = {
+      theme: {
+        extend: {
+          fontFamily: { sans: ['Inter', 'sans-serif'], mono: ['JetBrains Mono', 'monospace'] },
+          colors: {
+            bg: '#09090b',
+            surface: '#18181b',
+            border: '#27272a',
+            accent: '#a78bfa',
+            'accent-blue': '#60a5fa',
+            muted: '#a1a1aa',
+          }
+        }
+      }
+    }
+  </script>
+  <style>
+    pre[class*="language-"] { margin: 0; border-radius: 0.75rem; background: #18181b !important; border: 1px solid #27272a; }
+    code[class*="language-"] { font-family: 'JetBrains Mono', monospace; font-size: 0.8125rem; }
+    ::-webkit-scrollbar { width: 6px; height: 6px; }
+    ::-webkit-scrollbar-track { background: transparent; }
+    ::-webkit-scrollbar-thumb { background: #27272a; border-radius: 3px; }
+
+    .gradient-text {
+      background: linear-gradient(135deg, #a78bfa 0%, #60a5fa 50%, #a78bfa 100%);
+      -webkit-background-clip: text;
+      -webkit-text-fill-color: transparent;
+      background-clip: text;
+    }
+
+    .gradient-border {
+      position: relative;
+      background: #18181b;
+      border-radius: 0.75rem;
+    }
+    .gradient-border::before {
+      content: '';
+      position: absolute;
+      inset: -1px;
+      border-radius: inherit;
+      padding: 1px;
+      background: linear-gradient(135deg, #a78bfa, #60a5fa);
+      -webkit-mask: linear-gradient(#fff 0 0) content-box, linear-gradient(#fff 0 0);
+      -webkit-mask-composite: xor;
+      mask-composite: exclude;
+      pointer-events: none;
+    }
+
+    .glow {
+      position: relative;
+    }
+    .glow::after {
+      content: '';
+      position: absolute;
+      inset: -40%;
+      background: radial-gradient(ellipse at center, rgba(167, 139, 250, 0.08) 0%, transparent 70%);
+      pointer-events: none;
+      z-index: -1;
+    }
+
+    .glass {
+      background: rgba(24, 24, 27, 0.6);
+      backdrop-filter: blur(12px);
+      -webkit-backdrop-filter: blur(12px);
+      border: 1px solid rgba(39, 39, 42, 0.8);
+    }
+
+    @keyframes fadeUp {
+      from { opacity: 0; transform: translateY(20px); }
+      to { opacity: 1; transform: translateY(0); }
+    }
+    .fade-up { opacity: 0; }
+    .fade-up.visible { animation: fadeUp 0.6s ease-out forwards; }
+
+    @keyframes stepIn {
+      0%, 5% { opacity: 0; transform: translateY(10px); }
+      10%, 90% { opacity: 1; transform: translateY(0); }
+      95%, 100% { opacity: 1; transform: translateY(0); }
+    }
+    .hero-timeline { counter-reset: step; }
+    .hero-step { opacity: 0; animation: stepIn 10s ease-out forwards; }
+    .hero-step:nth-child(1) { animation-delay: 0.2s; }
+    .hero-step:nth-child(2) { animation-delay: 1.6s; }
+    .hero-step:nth-child(3) { animation-delay: 3.0s; }
+    .hero-step:nth-child(4) { animation-delay: 4.4s; }
+    .hero-step:nth-child(5) { animation-delay: 5.8s; }
+
+    .card-hover {
+      transition: transform 0.2s ease, border-color 0.2s ease, box-shadow 0.2s ease;
+    }
+    .card-hover:hover {
+      transform: translateY(-2px);
+      border-color: rgba(167, 139, 250, 0.3);
+      box-shadow: 0 4px 24px rgba(167, 139, 250, 0.06);
+    }
+
+    .hero-glow {
+      position: absolute;
+      top: -20%;
+      left: 50%;
+      transform: translateX(-50%);
+      width: 800px;
+      height: 600px;
+      background: radial-gradient(ellipse at center, rgba(167, 139, 250, 0.1) 0%, rgba(96, 165, 250, 0.05) 40%, transparent 70%);
+      pointer-events: none;
+      z-index: 0;
+    }
+  </style>
+</head>
+<body class="bg-bg text-zinc-300 font-sans antialiased">
+
+  <!-- Nav -->
+  <nav class="sticky top-0 z-50 bg-bg/70 backdrop-blur-xl border-b border-white/[0.06]">
+    <div class="max-w-6xl mx-auto px-6 h-14 flex items-center justify-between">
+      <a href="index.html" class="font-bold text-lg gradient-text">llm-contract</a>
+      <div class="flex items-center gap-6 text-sm text-zinc-500">
+        <a href="#repairs" class="hover:text-zinc-200 transition">Repairs</a>
+        <a href="primitives.html" class="hover:text-zinc-200 transition">Primitives</a>
+        <a href="invariants.html" class="hover:text-zinc-200 transition">Invariants</a>
+        <a href="observability.html" class="hover:text-zinc-200 transition">Observability</a>
+        <a href="api.html" class="hover:text-zinc-200 transition">API</a>
+        <a href="examples.html" class="hover:text-zinc-200 transition">Examples</a>
+        <a href="https://github.com/operatorstack/llm-contract" class="hover:text-zinc-200 transition" target="_blank">GitHub</a>
+      </div>
+    </div>
+  </nav>
+
+  <!-- Hero -->
+  <section class="relative max-w-6xl mx-auto px-6 pt-28 pb-20 overflow-hidden">
+    <div class="hero-glow"></div>
+    <div class="relative z-10">
+      <span class="inline-flex items-center gap-2 text-xs font-medium px-3 py-1 rounded-full mb-8 gradient-border"><span class="gradient-text">Preview release</span></span>
+      <h1 class="text-4xl sm:text-5xl lg:text-6xl font-extrabold tracking-tight leading-[1.1] mb-6">
+        <span class="gradient-text">Turn one error into a permanent<br>improvement</span> <span class="text-white">— automatically.</span>
+      </h1>
+      <p class="text-lg text-zinc-400 max-w-2xl mb-12 leading-relaxed">
+        See a bad LLM output. Write one rule. From now on, that error is caught, the model gets targeted feedback, and it self-corrects — on every future call, without touching your prompt.
+      </p>
+
+      <!-- Animated timeline -->
+      <div class="hero-timeline grid grid-cols-1 sm:grid-cols-5 gap-3 sm:gap-2 mb-12 max-w-3xl">
+        <div class="hero-step">
+          <div class="glass rounded-xl px-4 py-3 border-red-500/20" style="border-color: rgba(239,68,68,0.2)">
+            <div class="flex items-center gap-2 mb-1.5">
+              <span class="w-2 h-2 rounded-full bg-red-400 flex-shrink-0"></span>
+              <span class="text-[10px] font-semibold uppercase tracking-widest text-red-400">Error spotted</span>
+            </div>
+            <p class="font-mono text-xs text-zinc-400">tier: <span class="text-red-400">"hot"</span>, score: <span class="text-white">25</span></p>
+          </div>
+        </div>
+        <div class="hero-step">
+          <div class="glass rounded-xl px-4 py-3" style="border-color: rgba(167,139,250,0.2)">
+            <div class="flex items-center gap-2 mb-1.5">
+              <span class="w-2 h-2 rounded-full bg-accent flex-shrink-0"></span>
+              <span class="text-[10px] font-semibold uppercase tracking-widest text-accent">Add 1 rule</span>
+            </div>
+            <p class="font-mono text-[11px] text-accent/80 leading-relaxed">score &gt;= 70 ||<br>tier !== "hot"</p>
+          </div>
+        </div>
+        <div class="hero-step">
+          <div class="glass rounded-xl px-4 py-3" style="border-color: rgba(74,222,128,0.2)">
+            <div class="flex items-center gap-2 mb-1.5">
+              <span class="w-2 h-2 rounded-full bg-green-400 flex-shrink-0"></span>
+              <span class="text-[10px] font-semibold uppercase tracking-widest text-green-400">Next call</span>
+            </div>
+            <p class="text-xs text-green-400/80">Caught. Repaired. Automatically.</p>
+          </div>
+        </div>
+        <div class="hero-step">
+          <div class="glass rounded-xl px-4 py-3" style="border-color: rgba(74,222,128,0.2)">
+            <div class="flex items-center gap-2 mb-1.5">
+              <span class="w-2 h-2 rounded-full bg-green-400 flex-shrink-0"></span>
+              <span class="text-[10px] font-semibold uppercase tracking-widest text-green-400">Every call after</span>
+            </div>
+            <p class="text-xs text-green-400/80">Same error. Always fixed.</p>
+          </div>
+        </div>
+        <div class="hero-step">
+          <div class="glass rounded-xl px-4 py-3" style="border-color: rgba(74,222,128,0.3)">
+            <div class="flex items-center gap-2 mb-1.5">
+              <span class="w-2 h-2 rounded-full bg-green-300 flex-shrink-0"></span>
+              <span class="text-[10px] font-semibold uppercase tracking-widest text-green-300">Permanent</span>
+            </div>
+            <p class="text-xs text-green-300/80">System stronger. Add more rules.</p>
+          </div>
+        </div>
+      </div>
+
+      <div class="flex items-center gap-4 mb-4">
+        <code class="gradient-border px-5 py-2.5 text-sm font-mono text-zinc-300">npm install llm-contract zod</code>
+      </div>
+      <p class="text-sm text-zinc-500">No framework. No provider lock-in. One dependency.</p>
+    </div>
+  </section>
+
+  <!-- See it work -->
+  <section class="max-w-6xl mx-auto px-6 py-20 border-t border-white/[0.06] fade-up">
+    <h2 class="text-2xl font-bold text-white mb-3 tracking-tight">See it work</h2>
+    <p class="text-zinc-400 mb-10 max-w-3xl">A lead scoring call. The model returns valid JSON — but the domain logic is wrong. llm-contract catches it and gets the model to fix it. No prompt changes.</p>
+
+    <div class="max-w-2xl mx-auto space-y-4">
+      <div>
+        <p class="text-xs text-zinc-500 mb-2 uppercase tracking-wider font-medium">Your prompt</p>
+        <div class="glass rounded-xl px-5 py-4">
+          <p class="text-zinc-300 text-sm leading-relaxed">"Score this lead based on their activity. Return company, score (0-100), tier (hot/warm/cold), whether they're qualified, and the recommended next action."</p>
+        </div>
+      </div>
+
+      <div>
+        <p class="text-xs text-zinc-500 mb-2 uppercase tracking-wider font-medium">LLM responds</p>
+        <div class="glass rounded-xl px-5 py-4">
+          <p class="text-zinc-600 text-xs font-mono mb-2">gpt-4o-mini</p>
+<pre class="text-zinc-400 text-sm font-mono leading-relaxed" style="background: transparent !important; border: none; padding: 0;">{
+  "company":    "TechVentures Inc",
+  "score":      <span class="text-white">25</span>,
+  "tier":       <span class="text-red-400">"hot"</span>,
+  "qualified":  true,
+  "signals":    ["visited pricing", "downloaded whitepaper"],
+  "nextAction": "close"
+}</pre>
+          <p class="text-zinc-600 text-xs mt-3">Valid JSON. Correct types. Schema passes. But a score of 25 is not a "hot" lead — and you don't "close" an unqualified one.</p>
+        </div>
+      </div>
+
+      <div class="relative">
+        <div class="absolute -left-3 top-0 bottom-0 w-0.5 rounded-full" style="background: linear-gradient(to bottom, #a78bfa, #60a5fa)"></div>
+        <p class="text-xs text-accent mb-2 uppercase tracking-wider font-semibold">llm-contract catches the error</p>
+        <div class="glass rounded-xl px-5 py-4" style="border-color: rgba(167,139,250,0.15)">
+          <p class="text-sm text-zinc-400 mb-3">Your invariant runs on the parsed response:</p>
+          <p class="text-accent font-mono text-xs bg-bg/60 rounded-lg px-3 py-2">(d) =&gt; d.tier !== "hot" || d.score &gt;= 70 || `tier is "hot" but score is ${d.score}`</p>
+          <p class="text-red-400 text-sm mt-3 font-medium">tier is "hot" but score is 25 &mdash; invariant failed</p>
+        </div>
+      </div>
+
+      <div class="relative">
+        <div class="absolute -left-3 top-0 bottom-0 w-0.5 rounded-full" style="background: linear-gradient(to bottom, #a78bfa, #60a5fa)"></div>
+        <p class="text-xs text-accent mb-2 uppercase tracking-wider font-semibold">llm-contract sends a new request automatically</p>
+        <div class="glass rounded-xl px-5 py-4" style="border-color: rgba(167,139,250,0.15)">
+          <p class="text-sm text-zinc-500 mb-2">Your original prompt stays the same. This repair message is appended:</p>
+          <div class="bg-red-500/[0.07] border border-red-500/15 rounded-lg px-4 py-3">
+            <p class="text-red-300 font-mono text-xs leading-relaxed">"Your response had valid types but violated schema constraints:<br><strong>tier is "hot" but score is 25 (minimum 70 for hot)</strong>"</p>
+          </div>
+          <p class="text-zinc-600 text-xs mt-3">The model knows exactly what's wrong. Not "try again" — the specific business rule it violated.</p>
+        </div>
+      </div>
+
+      <div>
+        <p class="text-xs text-zinc-500 mb-2 uppercase tracking-wider font-medium">LLM responds</p>
+        <div class="glass rounded-xl px-5 py-4" style="border-color: rgba(74,222,128,0.15)">
+          <p class="text-zinc-600 text-xs font-mono mb-2">gpt-4o-mini</p>
+<pre class="text-green-400 text-sm font-mono leading-relaxed" style="background: transparent !important; border: none; padding: 0;">{
+  "company":    "TechVentures Inc",
+  "score":      25,
+  "tier":       <span class="font-semibold">"cold"</span>,
+  "qualified":  false,
+  "signals":    ["visited pricing", "downloaded whitepaper"],
+  "nextAction": <span class="font-semibold">"nurture"</span>
+}</pre>
+        </div>
+      </div>
+
+      <div class="relative">
+        <div class="absolute -left-3 top-0 bottom-0 w-0.5 bg-green-500/30 rounded-full"></div>
+        <p class="text-xs text-green-400 mb-2 uppercase tracking-wider font-semibold">llm-contract returns</p>
+        <div class="glass rounded-xl px-5 py-4" style="border-color: rgba(74,222,128,0.15)">
+          <p class="text-sm text-zinc-300">All invariants pass. <code class="text-green-400 font-mono bg-bg/60 px-1.5 py-0.5 rounded text-xs">result.data</code> returned — fully typed, validated.</p>
+        </div>
+      </div>
+    </div>
+
+    <!-- What just happened -->
+    <div class="max-w-2xl mx-auto mt-8 gradient-border p-6">
+      <p class="text-white text-sm font-semibold mb-3">Notice what happened</p>
+      <p class="text-zinc-400 text-sm mb-4">The invariant only checked one thing: <em>tier vs. score</em>. But the model didn't just fix the tier — it re-reasoned the entire response:</p>
+      <div class="grid grid-cols-3 gap-3 text-center font-mono text-xs mb-4">
+        <div class="bg-bg/80 rounded-lg py-2.5 px-2">
+          <p class="text-zinc-600">tier</p>
+          <p><span class="text-red-400">"hot"</span> <span class="text-zinc-700">&rarr;</span> <span class="text-green-400">"cold"</span></p>
+        </div>
+        <div class="bg-bg/80 rounded-lg py-2.5 px-2">
+          <p class="text-zinc-600">qualified</p>
+          <p><span class="text-red-400">true</span> <span class="text-zinc-700">&rarr;</span> <span class="text-green-400">false</span></p>
+        </div>
+        <div class="bg-bg/80 rounded-lg py-2.5 px-2">
+          <p class="text-zinc-600">nextAction</p>
+          <p><span class="text-red-400">"close"</span> <span class="text-zinc-700">&rarr;</span> <span class="text-green-400">"nurture"</span></p>
+        </div>
+      </div>
+      <p class="text-zinc-500 text-sm">One invariant. Three fields corrected. The targeted feedback gave the model a reason to re-think the whole response — not just patch a single value.</p>
+    </div>
+  </section>
+
+  <!-- Without vs With -->
+  <section class="max-w-6xl mx-auto px-6 py-20 border-t border-white/[0.06] fade-up">
+    <h2 class="text-2xl font-bold text-white mb-10 tracking-tight">Without vs. with</h2>
+    <div class="grid md:grid-cols-2 gap-6">
+      <div class="glass rounded-xl p-6" style="border-color: rgba(239,68,68,0.15)">
+        <p class="text-xs text-red-400 uppercase tracking-wider mb-5 font-medium">Without llm-contract</p>
+        <ul class="text-sm text-zinc-400 space-y-3">
+          <li class="flex gap-3"><span class="text-red-500/70 flex-shrink-0 mt-0.5">&times;</span> Error reaches production, discovered downstream</li>
+          <li class="flex gap-3"><span class="text-red-500/70 flex-shrink-0 mt-0.5">&times;</span> You tweak the prompt — might fix this, might break that</li>
+          <li class="flex gap-3"><span class="text-red-500/70 flex-shrink-0 mt-0.5">&times;</span> Same error reappears after model upgrade</li>
+          <li class="flex gap-3"><span class="text-red-500/70 flex-shrink-0 mt-0.5">&times;</span> No data on what failed or how often</li>
+          <li class="flex gap-3"><span class="text-red-500/70 flex-shrink-0 mt-0.5">&times;</span> "Try again" retry — same prompt, same odds</li>
+        </ul>
+      </div>
+      <div class="glass rounded-xl p-6" style="border-color: rgba(74,222,128,0.15)">
+        <p class="text-xs text-green-400 uppercase tracking-wider mb-5 font-medium">With llm-contract</p>
+        <ul class="text-sm text-zinc-400 space-y-3">
+          <li class="flex gap-3"><span class="text-green-400 flex-shrink-0 mt-0.5">&check;</span> Error caught at the boundary, never reaches downstream</li>
+          <li class="flex gap-3"><span class="text-green-400 flex-shrink-0 mt-0.5">&check;</span> Exact violation fed back — prompt stays untouched</li>
+          <li class="flex gap-3"><span class="text-green-400 flex-shrink-0 mt-0.5">&check;</span> Invariant catches it again, automatically, forever</li>
+          <li class="flex gap-3"><span class="text-green-400 flex-shrink-0 mt-0.5">&check;</span> Every attempt logged with category, issues, duration</li>
+          <li class="flex gap-3"><span class="text-green-400 flex-shrink-0 mt-0.5">&check;</span> Targeted repair — model knows what to fix</li>
+        </ul>
+      </div>
+    </div>
+  </section>
+
+  <!-- Built-in targeted repairs -->
+  <section id="repairs" class="max-w-6xl mx-auto px-6 py-20 border-t border-white/[0.06] scroll-mt-16 fade-up">
+    <h2 class="text-2xl font-bold text-white mb-3 tracking-tight">Built-in targeted repairs</h2>
+    <p class="text-zinc-400 mb-10 max-w-3xl">llm-contract classifies every failure and generates a specific repair message — out of the box, before you write a single invariant.</p>
+
+    <div class="space-y-3 max-w-3xl">
+      <div class="glass rounded-xl overflow-hidden card-hover">
+        <div class="flex items-start gap-4 px-5 py-4">
+          <div class="flex-1 min-w-0">
+            <div class="flex items-center gap-2 mb-1">
+              <span class="text-xs font-mono font-semibold text-red-400 bg-red-500/10 px-2 py-0.5 rounded">EMPTY_RESPONSE</span>
+            </div>
+            <p class="text-zinc-600 text-xs mb-2">Model returned nothing</p>
+            <p class="text-zinc-400 text-sm font-mono leading-relaxed">"You returned an empty response. Please respond with a JSON object matching the requested schema."</p>
+          </div>
+        </div>
+      </div>
+
+      <div class="glass rounded-xl overflow-hidden card-hover">
+        <div class="flex items-start gap-4 px-5 py-4">
+          <div class="flex-1 min-w-0">
+            <div class="flex items-center gap-2 mb-1">
+              <span class="text-xs font-mono font-semibold text-red-400 bg-red-500/10 px-2 py-0.5 rounded">REFUSAL</span>
+            </div>
+            <p class="text-zinc-600 text-xs mb-2">Model said "I'm sorry, I can't..." instead of returning data</p>
+            <p class="text-zinc-400 text-sm font-mono leading-relaxed">"This is a structured data task. Your response should be a JSON object only, with no refusal or commentary."</p>
+          </div>
+        </div>
+      </div>
+
+      <div class="glass rounded-xl overflow-hidden card-hover">
+        <div class="flex items-start gap-4 px-5 py-4">
+          <div class="flex-1 min-w-0">
+            <div class="flex items-center gap-2 mb-1">
+              <span class="text-xs font-mono font-semibold text-yellow-400 bg-yellow-500/10 px-2 py-0.5 rounded">NO_JSON</span>
+            </div>
+            <p class="text-zinc-600 text-xs mb-2">Model returned prose, explanation, or commentary — no JSON at all</p>
+            <p class="text-zinc-400 text-sm font-mono leading-relaxed">"Your response contained no JSON. Respond with ONLY a valid JSON object, no explanation, no commentary, no markdown."</p>
+          </div>
+        </div>
+      </div>
+
+      <div class="glass rounded-xl overflow-hidden card-hover">
+        <div class="flex items-start gap-4 px-5 py-4">
+          <div class="flex-1 min-w-0">
+            <div class="flex items-center gap-2 mb-1">
+              <span class="text-xs font-mono font-semibold text-yellow-400 bg-yellow-500/10 px-2 py-0.5 rounded">TRUNCATED</span>
+            </div>
+            <p class="text-zinc-600 text-xs mb-2">JSON was cut off mid-response (token limit, network, etc.)</p>
+            <p class="text-zinc-400 text-sm font-mono leading-relaxed">"Your previous response was cut off and the JSON is incomplete. Please provide a complete, shorter JSON response."</p>
+          </div>
+        </div>
+      </div>
+
+      <div class="glass rounded-xl overflow-hidden card-hover">
+        <div class="flex items-start gap-4 px-5 py-4">
+          <div class="flex-1 min-w-0">
+            <div class="flex items-center gap-2 mb-1">
+              <span class="text-xs font-mono font-semibold text-yellow-400 bg-yellow-500/10 px-2 py-0.5 rounded">PARSE_ERROR</span>
+            </div>
+            <p class="text-zinc-600 text-xs mb-2">Response had JSON-like structure but couldn't be parsed</p>
+            <p class="text-zinc-400 text-sm font-mono leading-relaxed">"Your response contained malformed JSON that could not be parsed. Please respond with strictly valid JSON."</p>
+          </div>
+        </div>
+      </div>
+
+      <div class="glass rounded-xl overflow-hidden card-hover">
+        <div class="flex items-start gap-4 px-5 py-4">
+          <div class="flex-1 min-w-0">
+            <div class="flex items-center gap-2 mb-1">
+              <span class="text-xs font-mono font-semibold text-accent bg-accent/10 px-2 py-0.5 rounded">VALIDATION_ERROR</span>
+            </div>
+            <p class="text-zinc-600 text-xs mb-2">Valid JSON, but doesn't match the Zod schema — wrong types, missing fields, bad enums, range violations</p>
+            <p class="text-zinc-400 text-sm font-mono leading-relaxed">"Your previous response had validation errors:<br>&nbsp;&nbsp;- Expected 'high' | 'medium' | 'low', received 'urgent'<br>Please correct these issues and respond with valid JSON only."</p>
+          </div>
+        </div>
+      </div>
+
+      <!-- INVARIANT_ERROR — the power card -->
+      <div class="gradient-border overflow-hidden glow">
+        <div class="px-5 py-5">
+          <div class="flex items-center gap-3 mb-2">
+            <span class="text-xs font-mono font-semibold text-accent bg-accent/10 px-2 py-0.5 rounded">INVARIANT_ERROR</span>
+            <span class="text-[10px] font-semibold uppercase tracking-widest gradient-text">unlimited</span>
+          </div>
+          <p class="text-zinc-500 text-xs mb-4">Schema passes, types are correct — but your domain rules caught something the schema can't express. This is where the real power is.</p>
+          <p class="text-zinc-500 text-xs mb-3">Every invariant you add is another class of error the system catches and fixes automatically:</p>
+          <div class="space-y-2 font-mono text-xs">
+            <div class="bg-bg/60 rounded-lg px-4 py-2.5 border border-white/[0.04]">
+              <p class="text-zinc-600 mb-1">cross-field logic</p>
+              <p class="text-red-400">- tier is "hot" but score is 25 (minimum 70 for hot)</p>
+            </div>
+            <div class="bg-bg/60 rounded-lg px-4 py-2.5 border border-white/[0.04]">
+              <p class="text-zinc-600 mb-1">business rule</p>
+              <p class="text-red-400">- cannot block with confidence 0.3 (minimum 0.7)</p>
+            </div>
+            <div class="bg-bg/60 rounded-lg px-4 py-2.5 border border-white/[0.04]">
+              <p class="text-zinc-600 mb-1">consistency check</p>
+              <p class="text-red-400">- action is "allow" but categories are non-empty — contradictory</p>
+            </div>
+            <div class="bg-bg/60 rounded-lg px-4 py-2.5 border border-white/[0.04]">
+              <p class="text-zinc-600 mb-1">domain constraint</p>
+              <p class="text-red-400">- summary too long: 247 chars (max 200)</p>
+            </div>
+            <div class="bg-bg/60 rounded-lg px-4 py-2.5 border border-white/[0.04]">
+              <p class="text-zinc-600 mb-1">completeness rule</p>
+              <p class="text-red-400">- must have at least one tag</p>
+            </div>
+          </div>
+          <p class="text-zinc-500 text-xs mt-4">There's no limit to how many invariants you define. Each one you add is another error that becomes a permanent, automatic improvement. The more you write, the stronger the system gets.</p>
+        </div>
+      </div>
+    </div>
+
+    <p class="text-zinc-500 text-sm mt-8 max-w-3xl">
+      Every repair is generated automatically. The first five categories work out of the box — no configuration needed. Invariant errors include the exact violation string you defined, so the model gets domain-specific feedback.
+    </p>
+  </section>
+
+  <!-- Problem -->
+  <section class="max-w-6xl mx-auto px-6 py-20 border-t border-white/[0.06] fade-up">
+    <h2 class="text-2xl font-bold text-white mb-6 tracking-tight">The problem</h2>
+    <p class="text-zinc-400 max-w-3xl leading-relaxed mb-6">
+      LLMs are good — but not perfect. When a structured response comes back wrong, there's no good path from error to fix.
+    </p>
+    <div class="grid sm:grid-cols-2 gap-4 max-w-3xl mb-8">
+      <div class="glass rounded-xl px-5 py-4">
+        <p class="text-red-400 text-sm font-medium mb-2">Prompt engineering</p>
+        <p class="text-zinc-500 text-sm leading-relaxed">Slow, hard to test, and risky — a change that fixes one output can break three others.</p>
+      </div>
+      <div class="glass rounded-xl px-5 py-4">
+        <p class="text-red-400 text-sm font-medium mb-2">Waiting for the next model</p>
+        <p class="text-zinc-500 text-sm leading-relaxed">Maybe it fixes your issue. Maybe it doesn't. You have no control and no timeline.</p>
+      </div>
+      <div class="glass rounded-xl px-5 py-4">
+        <p class="text-red-400 text-sm font-medium mb-2">Disabling features</p>
+        <p class="text-zinc-500 text-sm leading-relaxed">Some teams just turn off what breaks. That's not a fix — it's giving up surface area.</p>
+      </div>
+      <div class="glass rounded-xl px-5 py-4">
+        <p class="text-red-400 text-sm font-medium mb-2">No signal</p>
+        <p class="text-zinc-500 text-sm leading-relaxed">You don't know which errors repeat, which fixes worked, or whether a model upgrade actually helped.</p>
+      </div>
+    </div>
+    <div class="gradient-border p-6 max-w-3xl">
+      <p class="text-white text-sm leading-relaxed">
+        <strong class="gradient-text">llm-contract flips this.</strong> Every error becomes a categorical fix that fires automatically. You get observability data on what fails and how often. And when you do change your prompt or upgrade your model, you have proof of whether it actually worked.
+      </p>
+      <p class="text-zinc-500 text-sm mt-3 leading-relaxed">
+        The problem isn't bad code — it's having no system for turning errors into improvements.
+      </p>
+    </div>
+  </section>
+
+  <!-- What this does -->
+  <section class="max-w-6xl mx-auto px-6 py-20 border-t border-white/[0.06] fade-up">
+    <h2 class="text-2xl font-bold text-white mb-8 tracking-tight">What this does</h2>
+    <p class="text-zinc-400 mb-8 max-w-3xl">
+      <code class="text-zinc-300 bg-surface px-1.5 py-0.5 rounded text-sm border border-border">llm-contract</code> wraps your existing LLM call with a deterministic contract:
+    </p>
+
+    <div class="glass rounded-xl p-8 mb-10">
+      <div class="flex flex-wrap items-center justify-center gap-3 text-sm font-mono">
+        <span class="bg-accent/10 text-accent px-3 py-1.5 rounded-lg">prompt</span>
+        <span class="text-zinc-600">&rarr;</span>
+        <span class="bg-white/[0.06] text-white px-3 py-1.5 rounded-lg border border-white/[0.08]">your LLM call</span>
+        <span class="text-zinc-600">&rarr;</span>
+        <span class="bg-accent/10 text-accent px-3 py-1.5 rounded-lg">clean</span>
+        <span class="text-zinc-600">&rarr;</span>
+        <span class="bg-accent/10 text-accent px-3 py-1.5 rounded-lg">check</span>
+        <span class="text-red-400/80 ml-2">&darr; fail</span>
+        <span class="text-zinc-600">&rarr;</span>
+        <span class="bg-red-500/10 text-red-400 px-3 py-1.5 rounded-lg">fix</span>
+        <span class="text-zinc-600">&rarr;</span>
+        <span class="text-zinc-500 italic">retry with targeted repair</span>
+      </div>
+    </div>
+
+    <ol class="space-y-3 text-zinc-400 max-w-3xl">
+      <li class="flex gap-3"><span class="gradient-text font-mono text-sm mt-0.5 font-semibold">1.</span> Generate structural instructions from your schema</li>
+      <li class="flex gap-3"><span class="gradient-text font-mono text-sm mt-0.5 font-semibold">2.</span> Call your model (any provider, any SDK)</li>
+      <li class="flex gap-3"><span class="gradient-text font-mono text-sm mt-0.5 font-semibold">3.</span> Clean raw output into JSON</li>
+      <li class="flex gap-3"><span class="gradient-text font-mono text-sm mt-0.5 font-semibold">4.</span> Validate against the schema (types, fields, enums, invariants)</li>
+      <li class="flex gap-3"><span class="gradient-text font-mono text-sm mt-0.5 font-semibold">5.</span> On failure, feed the exact violation back to the model</li>
+      <li class="flex gap-3"><span class="gradient-text font-mono text-sm mt-0.5 font-semibold">6.</span> Retry with targeted repair (bounded)</li>
+    </ol>
+    <p class="text-white font-semibold mt-8">The model is probabilistic. The boundary is not.</p>
+  </section>
+
+  <!-- Quick example -->
+  <section class="max-w-6xl mx-auto px-6 py-20 border-t border-white/[0.06] fade-up">
+    <h2 class="text-2xl font-bold text-white mb-8 tracking-tight">Quick example</h2>
+    <div class="max-w-3xl">
+      <pre class="rounded-xl overflow-hidden"><code class="language-typescript">import { enforce } from "llm-contract";
+import { z } from "zod";
+
+const result = await enforce(
+  z.object({
+    sentiment: z.enum(["positive", "negative", "neutral"]),
+    confidence: z.number().min(0).max(1),
+  }),
+  async (attempt) => {
+    const res = await openai.chat.completions.create({
+      model: "gpt-4o-mini",
+      messages: [
+        { role: "system", content: attempt.prompt },
+        { role: "user", content: "Analyze: 'I love this product'" },
+        ...attempt.fixes,
+      ],
+    });
+    return res.choices[0].message.content;
+  },
+  {
+    invariants: [
+      (data) => data.confidence > 0.5 || `confidence too low: ${data.confidence}`,
+    ],
+  },
+);
+
+if (result.ok) {
+  result.data; // { sentiment: "positive", confidence: 0.95 } — fully typed
+}</code></pre>
+    </div>
+    <ul class="mt-6 space-y-2 text-sm text-zinc-500 max-w-3xl">
+      <li><code class="text-zinc-300 bg-surface px-1 py-0.5 rounded border border-border text-xs">attempt.prompt</code> — auto-generated from the schema, no hand-written format instructions</li>
+      <li><code class="text-zinc-300 bg-surface px-1 py-0.5 rounded border border-border text-xs">attempt.fixes</code> — on retry, the exact violation fed back to the model</li>
+      <li><code class="text-zinc-300 bg-surface px-1 py-0.5 rounded border border-border text-xs">result.data</code> — typed, validated at runtime, no casts</li>
+      <li>Markdown fences, prose wrapping, string-typed numbers — cleaned automatically</li>
+    </ul>
+  </section>
+
+  <!-- Why this works -->
+  <section class="max-w-6xl mx-auto px-6 py-20 border-t border-white/[0.06] fade-up">
+    <h2 class="text-2xl font-bold text-white mb-6 tracking-tight">Why this works</h2>
+    <p class="text-zinc-400 max-w-3xl mb-6">
+      LLMs correct themselves reliably when you tell them <em class="text-zinc-300">exactly</em> what went wrong. Not "return valid JSON" — the specific constraint that failed:
+    </p>
+    <div class="glass rounded-xl p-5 mb-6 max-w-3xl space-y-3">
+      <div class="flex gap-3 items-start">
+        <span class="text-red-400 text-xs font-mono mt-0.5 flex-shrink-0">INVARIANT</span>
+        <code class="text-red-400 font-mono text-sm">tier is "hot" but score is 25 (minimum 70 for hot)</code>
+      </div>
+      <div class="flex gap-3 items-start">
+        <span class="text-red-400 text-xs font-mono mt-0.5 flex-shrink-0">INVARIANT</span>
+        <code class="text-red-400 font-mono text-sm">cannot block with confidence 0.3 (minimum 0.7)</code>
+      </div>
+      <div class="flex gap-3 items-start">
+        <span class="text-yellow-400 text-xs font-mono mt-0.5 flex-shrink-0">VALIDATION</span>
+        <code class="text-yellow-400 font-mono text-sm">Expected "high" | "medium" | "low", received "urgent"</code>
+      </div>
+    </div>
+    <p class="text-zinc-400 max-w-3xl mb-4">
+      Each message becomes the repair directive. The model doesn't change. Your prompt doesn't change. The boundary enforces correctness — on every call, for every error in that class, permanently.
+    </p>
+    <p class="text-white font-semibold max-w-3xl">
+      One invariant. Every future occurrence of that error. Automatic repair. Zero prompt changes.
+    </p>
+  </section>
+
+  <!-- When to use -->
+  <section class="max-w-6xl mx-auto px-6 py-20 border-t border-white/[0.06] fade-up">
+    <h2 class="text-2xl font-bold text-white mb-6 tracking-tight">When to use this</h2>
+    <p class="text-zinc-400 mb-6">Use <code class="text-zinc-300 bg-surface px-1.5 py-0.5 rounded text-sm border border-border">llm-contract</code> when LLM output feeds downstream logic and bad structure has cost:</p>
+    <div class="grid sm:grid-cols-2 gap-4 max-w-3xl">
+      <div class="glass rounded-xl p-5 card-hover">
+        <p class="text-white text-sm font-medium mb-1">Classification &amp; routing</p>
+        <p class="text-zinc-500 text-sm">Ticket triage, intent detection, content categorization</p>
+      </div>
+      <div class="glass rounded-xl p-5 card-hover">
+        <p class="text-white text-sm font-medium mb-1">Extraction</p>
+        <p class="text-zinc-500 text-sm">Forms, invoices, entities, document parsing</p>
+      </div>
+      <div class="glass rounded-xl p-5 card-hover">
+        <p class="text-white text-sm font-medium mb-1">Scoring &amp; normalization</p>
+        <p class="text-zinc-500 text-sm">Lead scoring, sentiment, risk assessment</p>
+      </div>
+      <div class="glass rounded-xl p-5 card-hover">
+        <p class="text-white text-sm font-medium mb-1">Moderation &amp; policy</p>
+        <p class="text-zinc-500 text-sm">Content review, compliance labeling</p>
+      </div>
+    </div>
+    <p class="text-zinc-600 text-sm mt-6">Not designed for free-form chat, creative writing, or tasks where structure doesn't matter.</p>
+  </section>
+
+  <!-- Explore -->
+  <section class="max-w-6xl mx-auto px-6 py-20 border-t border-white/[0.06] fade-up">
+    <h2 class="text-2xl font-bold text-white mb-10 tracking-tight">Explore</h2>
+    <div class="grid sm:grid-cols-2 lg:grid-cols-3 gap-4">
+      <a href="#repairs" class="glass rounded-xl p-6 card-hover group">
+        <h3 class="text-white font-medium mb-2 group-hover:text-accent transition">Targeted Repairs</h3>
+        <p class="text-zinc-500 text-sm">7 failure categories, each with a specific repair message — built in, zero configuration.</p>
+      </a>
+      <a href="primitives.html" class="glass rounded-xl p-6 card-hover group">
+        <h3 class="text-white font-medium mb-2 group-hover:text-accent transition">Primitives</h3>
+        <p class="text-zinc-500 text-sm">clean, check, classify, fix, select, prompt — each usable independently.</p>
+      </a>
+      <a href="invariants.html" class="glass rounded-xl p-6 card-hover group">
+        <h3 class="text-white font-medium mb-2 group-hover:text-accent transition">Invariants</h3>
+        <p class="text-zinc-500 text-sm">Schema rules Zod can't express. How they work, how to write them, how they compound.</p>
+      </a>
+      <a href="observability.html" class="glass rounded-xl p-6 card-hover group">
+        <h3 class="text-white font-medium mb-2 group-hover:text-accent transition">Observability</h3>
+        <p class="text-zinc-500 text-sm">Wire onAttempt into Langfuse, OpenTelemetry, or any tracing backend.</p>
+      </a>
+      <a href="api.html" class="glass rounded-xl p-6 card-hover group">
+        <h3 class="text-white font-medium mb-2 group-hover:text-accent transition">API Reference</h3>
+        <p class="text-zinc-500 text-sm">Full function signatures, options, and return types.</p>
+      </a>
+      <a href="examples.html" class="glass rounded-xl p-6 card-hover group">
+        <h3 class="text-white font-medium mb-2 group-hover:text-accent transition">Examples</h3>
+        <p class="text-zinc-500 text-sm">Before/after comparisons for sentiment, invoices, classification, and more.</p>
+      </a>
+    </div>
+  </section>
+
+  <!-- Footer -->
+  <footer class="border-t border-white/[0.06] mt-8">
+    <div class="max-w-6xl mx-auto px-6 py-8 flex flex-col sm:flex-row items-center justify-between gap-4 text-sm text-zinc-600">
+      <span>llm-contract &middot; MIT License &middot; Preview release</span>
+      <div class="flex gap-6">
+        <a href="https://github.com/operatorstack/llm-contract" class="hover:text-zinc-300 transition" target="_blank">GitHub</a>
+        <a href="https://www.npmjs.com/package/llm-contract" class="hover:text-zinc-300 transition" target="_blank">npm</a>
+      </div>
+    </div>
+  </footer>
+
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/prism/1.29.0/prism.min.js"></script>
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/prism/1.29.0/components/prism-typescript.min.js"></script>
+  <script>
+    const observer = new IntersectionObserver((entries) => {
+      entries.forEach(entry => {
+        if (entry.isIntersecting) {
+          entry.target.classList.add('visible');
+          observer.unobserve(entry.target);
+        }
+      });
+    }, { threshold: 0.1 });
+    document.querySelectorAll('.fade-up').forEach(el => observer.observe(el));
+  </script>
+</body>
+</html>

@@ -1,0 +1,268 @@
+<!DOCTYPE html>
+<html lang="en" class="scroll-smooth">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Primitives — llm-contract</title>
+  <meta name="description" content="Built-in primitives: clean, check, classify, fix, select, prompt. Each usable independently or as part of the enforce loop.">
+  <script src="https://cdn.tailwindcss.com"></script>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet">
+  <link href="https://cdnjs.cloudflare.com/ajax/libs/prism/1.29.0/themes/prism-tomorrow.min.css" rel="stylesheet">
+  <script>
+    tailwind.config = {
+      theme: {
+        extend: {
+          fontFamily: { sans: ['Inter', 'sans-serif'], mono: ['JetBrains Mono', 'monospace'] },
+          colors: {
+            bg: '#09090b',
+            surface: '#18181b',
+            border: '#27272a',
+            accent: '#a78bfa',
+            'accent-blue': '#60a5fa',
+            muted: '#a1a1aa',
+          }
+        }
+      }
+    }
+  </script>
+  <style>
+    pre[class*="language-"] { margin: 0; border-radius: 0.75rem; background: #18181b !important; border: 1px solid #27272a; }
+    code[class*="language-"] { font-family: 'JetBrains Mono', monospace; font-size: 0.8125rem; }
+    .gradient-text { background: linear-gradient(135deg, #a78bfa 0%, #60a5fa 50%, #a78bfa 100%); -webkit-background-clip: text; -webkit-text-fill-color: transparent; background-clip: text; }
+    .glass { background: rgba(24, 24, 27, 0.6); backdrop-filter: blur(12px); -webkit-backdrop-filter: blur(12px); border: 1px solid rgba(39, 39, 42, 0.8); }
+    .card-hover { transition: transform 0.2s ease, border-color 0.2s ease, box-shadow 0.2s ease; }
+    .card-hover:hover { transform: translateY(-2px); border-color: rgba(167, 139, 250, 0.3); box-shadow: 0 4px 24px rgba(167, 139, 250, 0.06); }
+    @keyframes fadeUp { from { opacity: 0; transform: translateY(20px); } to { opacity: 1; transform: translateY(0); } }
+    .fade-up { opacity: 0; }
+    .fade-up.visible { animation: fadeUp 0.6s ease-out forwards; }
+  </style>
+</head>
+<body class="bg-bg text-zinc-300 font-sans antialiased">
+
+  <nav class="sticky top-0 z-50 bg-bg/70 backdrop-blur-xl border-b border-white/[0.06]">
+    <div class="max-w-6xl mx-auto px-6 h-14 flex items-center justify-between">
+      <a href="index.html" class="font-bold text-lg gradient-text">llm-contract</a>
+      <div class="flex items-center gap-6 text-sm text-zinc-500">
+        <a href="index.html#repairs" class="hover:text-zinc-200 transition">Repairs</a>
+        <a href="primitives.html" class="text-white">Primitives</a>
+        <a href="invariants.html" class="hover:text-zinc-200 transition">Invariants</a>
+        <a href="observability.html" class="hover:text-zinc-200 transition">Observability</a>
+        <a href="api.html" class="hover:text-zinc-200 transition">API</a>
+        <a href="examples.html" class="hover:text-zinc-200 transition">Examples</a>
+        <a href="https://github.com/operatorstack/llm-contract" class="hover:text-zinc-200 transition" target="_blank">GitHub</a>
+      </div>
+    </div>
+  </nav>
+
+  <section class="max-w-6xl mx-auto px-6 pt-24 pb-12">
+    <h1 class="text-3xl sm:text-4xl font-extrabold text-white mb-4 tracking-tight"><span class="gradient-text">Primitives</span></h1>
+    <p class="text-zinc-400 text-lg max-w-3xl">
+      Six independent functions that handle the hard parts of working with LLM output. Use them inside <code class="text-zinc-300 bg-surface px-1.5 py-0.5 rounded text-sm border border-border">enforce</code>, or drop any one into an existing pipeline.
+    </p>
+  </section>
+
+  <section id="clean" class="max-w-6xl mx-auto px-6 py-14 border-t border-white/[0.06] fade-up">
+    <div class="flex items-center gap-3 mb-4">
+      <h2 class="text-2xl font-bold text-white tracking-tight">clean</h2>
+      <code class="text-xs font-mono text-zinc-500 bg-surface px-2 py-0.5 rounded border border-border">(raw: string) =&gt; unknown</code>
+    </div>
+    <p class="text-zinc-400 max-w-3xl mb-6">
+      Normalizes raw LLM output into clean JSON. Strips markdown fences, extracts JSON from prose wrapping, and coerces string-typed values to their correct types.
+    </p>
+    <div class="grid md:grid-cols-2 gap-4 mb-6">
+      <div class="glass rounded-xl p-5">
+        <p class="text-xs text-zinc-500 uppercase tracking-wider mb-3 font-medium">Markdown fences</p>
+        <pre><code class="language-typescript">clean('```json\n{"score": 85}\n```');
+// { score: 85 }</code></pre>
+      </div>
+      <div class="glass rounded-xl p-5">
+        <p class="text-xs text-zinc-500 uppercase tracking-wider mb-3 font-medium">Prose wrapping</p>
+        <pre><code class="language-typescript">clean('Here you go: {"score": "85"}');
+// { score: 85 }</code></pre>
+      </div>
+      <div class="glass rounded-xl p-5">
+        <p class="text-xs text-zinc-500 uppercase tracking-wider mb-3 font-medium">Type coercion</p>
+        <pre><code class="language-typescript">clean('{"active": "true", "count": "3"}');
+// { active: true, count: 3 }</code></pre>
+      </div>
+      <div class="glass rounded-xl p-5">
+        <p class="text-xs text-zinc-500 uppercase tracking-wider mb-3 font-medium">Language variations</p>
+        <pre><code class="language-typescript">clean('```JSON\n{"score": 85}\n```');
+// { score: 85 }</code></pre>
+      </div>
+    </div>
+    <p class="text-zinc-500 text-sm">
+      This runs automatically inside <code class="text-zinc-300 bg-surface px-1 py-0.5 rounded text-sm border border-border">enforce</code>. Use it standalone when you already have raw output and want clean JSON.
+    </p>
+  </section>
+
+  <section id="check" class="max-w-6xl mx-auto px-6 py-14 border-t border-white/[0.06] fade-up">
+    <div class="flex items-center gap-3 mb-4">
+      <h2 class="text-2xl font-bold text-white tracking-tight">check</h2>
+      <code class="text-xs font-mono text-zinc-500 bg-surface px-2 py-0.5 rounded border border-border">(data, schema, invariants?) =&gt; Result&lt;T&gt;</code>
+    </div>
+    <p class="text-zinc-400 max-w-3xl mb-6">
+      Validates data against a Zod schema and optional invariants. Deterministic — no LLM involved. Returns typed data or a structured error with every issue listed.
+    </p>
+    <div class="space-y-4">
+      <div class="glass rounded-xl p-5">
+        <p class="text-xs text-green-400 uppercase tracking-wider mb-3 font-medium">Pass</p>
+        <pre><code class="language-typescript">check({ name: "Alice", age: 30 }, Schema);
+// { ok: true, data: { name: "Alice", age: 30 } }</code></pre>
+      </div>
+      <div class="glass rounded-xl p-5">
+        <p class="text-xs text-red-400 uppercase tracking-wider mb-3 font-medium">Fail — schema violation</p>
+        <pre><code class="language-typescript">check({ name: "Alice", age: -5 }, Schema);
+// { ok: false, error: { issues: ["age: must be >= 0 (received -5)"] } }</code></pre>
+      </div>
+      <div class="glass rounded-xl p-5">
+        <p class="text-xs text-red-400 uppercase tracking-wider mb-3 font-medium">Fail — missing field</p>
+        <pre><code class="language-typescript">check({ name: 123 }, Schema);
+// { ok: false, error: { issues: ["name: expected string, got number", "age: required"] } }</code></pre>
+      </div>
+    </div>
+  </section>
+
+  <section id="classify" class="max-w-6xl mx-auto px-6 py-14 border-t border-white/[0.06] fade-up">
+    <div class="flex items-center gap-3 mb-4">
+      <h2 class="text-2xl font-bold text-white tracking-tight">classify</h2>
+      <code class="text-xs font-mono text-zinc-500 bg-surface px-2 py-0.5 rounded border border-border">(raw, cleaned) =&gt; FailureCategory</code>
+    </div>
+    <p class="text-zinc-400 max-w-3xl mb-6">
+      Categorizes a failed LLM response into one of 8 failure types. Used internally by <code class="text-zinc-300 bg-surface px-1 py-0.5 rounded text-sm border border-border">enforce</code> to generate the right repair message for each situation.
+    </p>
+    <div class="overflow-x-auto">
+      <table class="w-full text-sm">
+        <thead>
+          <tr class="border-b border-white/[0.08] text-left">
+            <th class="py-3 pr-6 text-white font-medium">Category</th>
+            <th class="py-3 pr-6 text-white font-medium">What happened</th>
+            <th class="py-3 text-white font-medium">Default repair</th>
+          </tr>
+        </thead>
+        <tbody class="text-zinc-400">
+          <tr class="border-b border-white/[0.04]"><td class="py-3 pr-6 font-mono text-xs text-accent">EMPTY_RESPONSE</td><td class="py-3 pr-6">Model returned nothing</td><td class="py-3">Ask for JSON matching the schema</td></tr>
+          <tr class="border-b border-white/[0.04]"><td class="py-3 pr-6 font-mono text-xs text-accent">REFUSAL</td><td class="py-3 pr-6">Model declined ("I'm sorry", "as an AI")</td><td class="py-3">Redirect to structured data task</td></tr>
+          <tr class="border-b border-white/[0.04]"><td class="py-3 pr-6 font-mono text-xs text-accent">NO_JSON</td><td class="py-3 pr-6">Response contained no JSON at all</td><td class="py-3">Ask for JSON only, no prose</td></tr>
+          <tr class="border-b border-white/[0.04]"><td class="py-3 pr-6 font-mono text-xs text-accent">TRUNCATED</td><td class="py-3 pr-6">JSON cut off (unbalanced braces)</td><td class="py-3">Ask for a shorter, complete response</td></tr>
+          <tr class="border-b border-white/[0.04]"><td class="py-3 pr-6 font-mono text-xs text-accent">PARSE_ERROR</td><td class="py-3 pr-6">JSON present but malformed</td><td class="py-3">Ask for strictly valid JSON</td></tr>
+          <tr class="border-b border-white/[0.04]"><td class="py-3 pr-6 font-mono text-xs text-accent">VALIDATION_ERROR</td><td class="py-3 pr-6">Valid JSON but failed schema</td><td class="py-3">List the specific Zod errors</td></tr>
+          <tr class="border-b border-white/[0.04]"><td class="py-3 pr-6 font-mono text-xs text-accent">INVARIANT_ERROR</td><td class="py-3 pr-6">Correct types but failed constraints</td><td class="py-3">List the specific violations</td></tr>
+          <tr><td class="py-3 pr-6 font-mono text-xs text-accent">RUN_ERROR</td><td class="py-3 pr-6">Your function threw an exception</td><td class="py-3">Ask to try again</td></tr>
+        </tbody>
+      </table>
+    </div>
+  </section>
+
+  <section id="fix" class="max-w-6xl mx-auto px-6 py-14 border-t border-white/[0.06] fade-up">
+    <div class="flex items-center gap-3 mb-4">
+      <h2 class="text-2xl font-bold text-white tracking-tight">fix</h2>
+      <code class="text-xs font-mono text-zinc-500 bg-surface px-2 py-0.5 rounded border border-border">(detail, repairs?) =&gt; Message[] | false</code>
+    </div>
+    <p class="text-zinc-400 max-w-3xl mb-6">
+      Turns validation failures into targeted repair messages for the next attempt. The output is an array of messages you append to the conversation — the model gets specific feedback about what went wrong.
+    </p>
+    <div class="glass rounded-xl p-5 mb-4">
+      <pre><code class="language-typescript">fix(checkResult.error);
+// [{
+//   role: "user",
+//   content: "Your previous response had validation errors:\n"
+//     + "- age: must be >= 0 (received -5)\n"
+//     + "- email: expected string, got undefined\n"
+//     + "Please correct these issues and respond with valid JSON."
+// }]</code></pre>
+    </div>
+    <p class="text-zinc-500 text-sm">
+      You can override or disable repair for any category. Pass <code class="text-zinc-300 bg-surface px-1 py-0.5 rounded text-sm border border-border">false</code> to stop retrying a specific failure type.
+    </p>
+  </section>
+
+  <section id="select" class="max-w-6xl mx-auto px-6 py-14 border-t border-white/[0.06] fade-up">
+    <div class="flex items-center gap-3 mb-4">
+      <h2 class="text-2xl font-bold text-white tracking-tight">select</h2>
+      <code class="text-xs font-mono text-zinc-500 bg-surface px-2 py-0.5 rounded border border-border">(state, schema) =&gt; Record&lt;string, unknown&gt;</code>
+    </div>
+    <p class="text-zinc-400 max-w-3xl mb-6">
+      Strips a state object down to only the fields the schema defines. Prevents sending PII, secrets, or unrelated data to the LLM.
+    </p>
+    <div class="glass rounded-xl p-5 mb-4">
+      <pre><code class="language-typescript">const fullUser = {
+  name: "Alice Chen",
+  email: "alice@company.com",
+  ssn: "123-45-6789",
+  passwordHash: "$2b$10$abc...",
+  loginHistory: [{ ts: "2024-01-01", ip: "10.0.0.1" }],
+};
+
+select(fullUser, z.object({ name: z.string(), email: z.string() }));
+// { name: "Alice Chen", email: "alice@company.com" }
+//
+// ssn, passwordHash, loginHistory — gone.
+// The LLM never sees them.</code></pre>
+    </div>
+  </section>
+
+  <section id="prompt" class="max-w-6xl mx-auto px-6 py-14 border-t border-white/[0.06] fade-up">
+    <div class="flex items-center gap-3 mb-4">
+      <h2 class="text-2xl font-bold text-white tracking-tight">prompt</h2>
+      <code class="text-xs font-mono text-zinc-500 bg-surface px-2 py-0.5 rounded border border-border">(schema: ZodType) =&gt; string</code>
+    </div>
+    <p class="text-zinc-400 max-w-3xl mb-6">
+      Generates format instructions from a Zod schema. Used internally by <code class="text-zinc-300 bg-surface px-1 py-0.5 rounded text-sm border border-border">enforce</code> to populate <code class="text-zinc-300 bg-surface px-1 py-0.5 rounded text-sm border border-border">attempt.prompt</code>. Use it directly when building prompts manually.
+    </p>
+    <div class="glass rounded-xl p-5">
+      <pre><code class="language-typescript">import { prompt } from "llm-contract";
+import { z } from "zod";
+
+const instructions = prompt(
+  z.object({
+    sentiment: z.enum(["positive", "negative", "neutral"]),
+    confidence: z.number().min(0).max(1),
+  })
+);
+// Generates format instructions describing the expected JSON shape,
+// field types, enums, and constraints — ready to use as a system message.</code></pre>
+    </div>
+  </section>
+
+  <section class="max-w-6xl mx-auto px-6 py-14 border-t border-white/[0.06] fade-up">
+    <h2 class="text-2xl font-bold text-white mb-6 tracking-tight">Composability</h2>
+    <p class="text-zinc-400 max-w-3xl mb-6">
+      <code class="text-zinc-300 bg-surface px-1.5 py-0.5 rounded text-sm border border-border">enforce</code> runs the full loop. But every primitive is exported independently — use whichever pieces fit your pipeline.
+    </p>
+    <div class="glass rounded-xl p-5">
+      <pre><code class="language-typescript">import { clean, check, fix, classify } from "llm-contract";
+
+const raw = await yourLLMCall();
+const cleaned = clean(raw);
+const result = check(cleaned, schema, invariants);
+
+if (!result.ok) {
+  const category = classify(raw, cleaned);
+  const repairs = fix(result.error);
+  // feed repairs back into your own retry logic
+}</code></pre>
+    </div>
+  </section>
+
+  <footer class="border-t border-white/[0.06] mt-8">
+    <div class="max-w-6xl mx-auto px-6 py-8 flex flex-col sm:flex-row items-center justify-between gap-4 text-sm text-zinc-600">
+      <span>llm-contract &middot; MIT License &middot; Preview release</span>
+      <div class="flex gap-6">
+        <a href="https://github.com/operatorstack/llm-contract" class="hover:text-zinc-300 transition" target="_blank">GitHub</a>
+        <a href="https://www.npmjs.com/package/llm-contract" class="hover:text-zinc-300 transition" target="_blank">npm</a>
+      </div>
+    </div>
+  </footer>
+
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/prism/1.29.0/prism.min.js"></script>
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/prism/1.29.0/components/prism-typescript.min.js"></script>
+  <script>
+    const observer = new IntersectionObserver((entries) => {
+      entries.forEach(entry => { if (entry.isIntersecting) { entry.target.classList.add('visible'); observer.unobserve(entry.target); } });
+    }, { threshold: 0.1 });
+    document.querySelectorAll('.fade-up').forEach(el => observer.observe(el));
+  </script>
+</body>
+</html>

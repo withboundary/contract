@@ -1,0 +1,473 @@
+<!DOCTYPE html>
+<html lang="en" class="scroll-smooth">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Examples — llm-contract</title>
+  <meta name="description" content="Before/after comparisons for sentiment analysis, invoice extraction, classification, and more.">
+  <script src="https://cdn.tailwindcss.com"></script>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet">
+  <link href="https://cdnjs.cloudflare.com/ajax/libs/prism/1.29.0/themes/prism-tomorrow.min.css" rel="stylesheet">
+  <script>
+    tailwind.config = {
+      theme: {
+        extend: {
+          fontFamily: { sans: ['Inter', 'sans-serif'], mono: ['JetBrains Mono', 'monospace'] },
+          colors: {
+            bg: '#09090b',
+            surface: '#18181b',
+            border: '#27272a',
+            accent: '#a78bfa',
+            'accent-blue': '#60a5fa',
+            muted: '#a1a1aa',
+          }
+        }
+      }
+    }
+  </script>
+  <style>
+    pre[class*="language-"] { margin: 0; border-radius: 0.75rem; background: #18181b !important; border: 1px solid #27272a; }
+    code[class*="language-"] { font-family: 'JetBrains Mono', monospace; font-size: 0.8125rem; }
+    .gradient-text { background: linear-gradient(135deg, #a78bfa 0%, #60a5fa 50%, #a78bfa 100%); -webkit-background-clip: text; -webkit-text-fill-color: transparent; background-clip: text; }
+    .gradient-border { position: relative; background: #18181b; border-radius: 0.75rem; }
+    .gradient-border::before { content: ''; position: absolute; inset: -1px; border-radius: inherit; padding: 1px; background: linear-gradient(135deg, #a78bfa, #60a5fa); -webkit-mask: linear-gradient(#fff 0 0) content-box, linear-gradient(#fff 0 0); -webkit-mask-composite: xor; mask-composite: exclude; pointer-events: none; }
+    .glass { background: rgba(24, 24, 27, 0.6); backdrop-filter: blur(12px); -webkit-backdrop-filter: blur(12px); border: 1px solid rgba(39, 39, 42, 0.8); }
+    .card-hover { transition: transform 0.2s ease, border-color 0.2s ease, box-shadow 0.2s ease; }
+    .card-hover:hover { transform: translateY(-2px); border-color: rgba(167, 139, 250, 0.3); box-shadow: 0 4px 24px rgba(167, 139, 250, 0.06); }
+    @keyframes fadeUp { from { opacity: 0; transform: translateY(20px); } to { opacity: 1; transform: translateY(0); } }
+    .fade-up { opacity: 0; }
+    .fade-up.visible { animation: fadeUp 0.6s ease-out forwards; }
+  </style>
+</head>
+<body class="bg-bg text-zinc-300 font-sans antialiased">
+
+  <nav class="sticky top-0 z-50 bg-bg/70 backdrop-blur-xl border-b border-white/[0.06]">
+    <div class="max-w-6xl mx-auto px-6 h-14 flex items-center justify-between">
+      <a href="index.html" class="font-bold text-lg gradient-text">llm-contract</a>
+      <div class="flex items-center gap-6 text-sm text-zinc-500">
+        <a href="index.html#repairs" class="hover:text-zinc-200 transition">Repairs</a>
+        <a href="primitives.html" class="hover:text-zinc-200 transition">Primitives</a>
+        <a href="invariants.html" class="hover:text-zinc-200 transition">Invariants</a>
+        <a href="observability.html" class="hover:text-zinc-200 transition">Observability</a>
+        <a href="api.html" class="hover:text-zinc-200 transition">API</a>
+        <a href="examples.html" class="text-white">Examples</a>
+        <a href="https://github.com/operatorstack/llm-contract" class="hover:text-zinc-200 transition" target="_blank">GitHub</a>
+      </div>
+    </div>
+  </nav>
+
+  <section class="max-w-6xl mx-auto px-6 pt-24 pb-12">
+    <h1 class="text-3xl sm:text-4xl font-extrabold text-white mb-4 tracking-tight"><span class="gradient-text">Examples</span></h1>
+    <p class="text-zinc-400 text-lg max-w-3xl">
+      Before/after comparisons showing what changes when you use <code class="text-zinc-300 bg-surface px-1.5 py-0.5 rounded text-sm border border-border">llm-contract</code>.
+    </p>
+    <div class="flex flex-wrap gap-3 mt-6 text-sm">
+      <a href="#sentiment" class="glass rounded-lg px-3 py-1.5 text-accent card-hover">Sentiment Analysis</a>
+      <a href="#invoice" class="glass rounded-lg px-3 py-1.5 text-accent card-hover">Invoice Extraction</a>
+      <a href="#classification" class="glass rounded-lg px-3 py-1.5 text-accent card-hover">Ticket Classification</a>
+    </div>
+  </section>
+
+  <section id="sentiment" class="max-w-6xl mx-auto px-6 py-14 border-t border-white/[0.06] fade-up">
+    <h2 class="text-2xl font-bold text-white mb-2 tracking-tight">Sentiment Analysis</h2>
+    <p class="text-zinc-400 mb-8">Parse LLM output into a typed sentiment + confidence score.</p>
+
+    <div class="grid lg:grid-cols-2 gap-6 mb-6">
+      <div>
+        <div class="flex items-center gap-2 mb-3">
+          <span class="text-xs font-medium text-red-400 bg-red-500/10 px-2.5 py-1 rounded">Before</span>
+          <span class="text-xs text-zinc-600">~50 lines, fragile</span>
+        </div>
+        <div class="glass rounded-xl p-5 h-full">
+          <pre><code class="language-typescript">async function analyzeSentiment(text: string) {
+  const response = await openai.chat.completions.create({
+    model: "gpt-4o-mini",
+    messages: [{
+      role: "system",
+      content: "Analyze the sentiment. Return JSON with: "
+        + "sentiment (positive/negative/neutral), "
+        + "confidence (0-1). Return ONLY JSON.",
+    }, { role: "user", content: text }],
+  });
+
+  const raw = response.choices[0].message.content ?? "";
+
+  let cleaned = raw
+    .replace(/```json\n?/g, "")
+    .replace(/```\n?/g, "")
+    .trim();
+
+  let parsed;
+  try {
+    parsed = JSON.parse(cleaned);
+  } catch {
+    throw new Error(`Invalid JSON: ${raw}`);
+  }
+
+  if (!["positive", "negative", "neutral"]
+    .includes(parsed.sentiment)) {
+    throw new Error(`Bad sentiment: ${parsed.sentiment}`);
+  }
+  if (typeof parsed.confidence !== "number"
+    || parsed.confidence < 0
+    || parsed.confidence > 1) {
+    throw new Error(`Bad confidence: ${parsed.confidence}`);
+  }
+
+  return parsed as {
+    sentiment: "positive" | "negative" | "neutral";
+    confidence: number;
+  };
+}</code></pre>
+        </div>
+      </div>
+
+      <div>
+        <div class="flex items-center gap-2 mb-3">
+          <span class="text-xs font-medium text-green-400 bg-green-500/10 px-2.5 py-1 rounded">After</span>
+          <span class="text-xs text-zinc-600">~15 lines, typed</span>
+        </div>
+        <div class="glass rounded-xl p-5 h-full">
+          <pre><code class="language-typescript">import { enforce } from "llm-contract";
+import { z } from "zod";
+
+const Sentiment = z.object({
+  sentiment: z.enum(["positive", "negative", "neutral"]),
+  confidence: z.number().min(0).max(1),
+});
+
+async function analyzeSentiment(text: string) {
+  return enforce(Sentiment, async (attempt) => {
+    const res = await openai.chat.completions.create({
+      model: "gpt-4o-mini",
+      messages: [
+        { role: "system", content: attempt.prompt },
+        { role: "user", content: text },
+        ...attempt.fixes,
+      ],
+    });
+    return res.choices[0].message.content;
+  });
+}</code></pre>
+        </div>
+      </div>
+    </div>
+
+    <div class="gradient-border p-6">
+      <p class="text-white font-semibold mb-3">What changed</p>
+      <ul class="text-zinc-400 text-sm space-y-1.5">
+        <li>Schema is the single source of truth for types AND validation AND prompt</li>
+        <li><code class="text-zinc-300 bg-bg/60 px-1 py-0.5 rounded text-xs border border-white/[0.04]">attempt.prompt</code> auto-generated from schema — always in sync</li>
+        <li><code class="text-zinc-300 bg-bg/60 px-1 py-0.5 rounded text-xs border border-white/[0.04]">clean</code> runs automatically — handles fences, prose, type coercion</li>
+        <li>If validation fails, <code class="text-zinc-300 bg-bg/60 px-1 py-0.5 rounded text-xs border border-white/[0.04]">attempt.fixes</code> contains repair on retry</li>
+        <li>Return type is <code class="text-zinc-300 bg-bg/60 px-1 py-0.5 rounded text-xs border border-white/[0.04]">Result&lt;T&gt;</code> — real types, no cast</li>
+      </ul>
+    </div>
+  </section>
+
+  <section id="invoice" class="max-w-6xl mx-auto px-6 py-14 border-t border-white/[0.06] fade-up">
+    <h2 class="text-2xl font-bold text-white mb-2 tracking-tight">Invoice Extraction</h2>
+    <p class="text-zinc-400 mb-8">Extract structured data from PDFs with cross-field math invariants.</p>
+
+    <div class="grid lg:grid-cols-2 gap-6 mb-6">
+      <div>
+        <div class="flex items-center gap-2 mb-3">
+          <span class="text-xs font-medium text-red-400 bg-red-500/10 px-2.5 py-1 rounded">Before</span>
+          <span class="text-xs text-zinc-600">~50 lines, no math checks</span>
+        </div>
+        <div class="glass rounded-xl p-5 h-full">
+          <pre><code class="language-typescript">async function extractInvoice(pdfText: string) {
+  let lastError: string | undefined;
+
+  for (let attempt = 0; attempt < 3; attempt++) {
+    const messages: Array&lt;{ role: string; content: string }&gt; = [
+      {
+        role: "system",
+        content: `Extract these fields as JSON:
+- vendor (string)
+- invoiceNumber (string)
+- date (YYYY-MM-DD)
+- lineItems (array: description, quantity,
+  unitPrice, amount)
+- subtotal, tax, total (numbers)
+Return ONLY valid JSON.`,
+      },
+      { role: "user", content: pdfText },
+    ];
+
+    if (attempt > 0 && lastError) {
+      messages.push({
+        role: "user",
+        content: `Previous response was invalid:
+  ${lastError}. Please fix.`,
+      });
+    }
+
+    const res = await openai.chat.completions.create({
+      model: "gpt-4o",
+      messages: messages as any,
+    });
+
+    const raw = res.choices[0].message.content ?? "";
+    let parsed: any;
+    try {
+      parsed = JSON.parse(
+        raw.replace(/```json\n?/g, "")
+           .replace(/```\n?/g, "").trim()
+      );
+    } catch {
+      lastError = "Not valid JSON";
+      continue;
+    }
+
+    if (typeof parsed.total !== "number") {
+      lastError = "total must be a number";
+      continue;
+    }
+
+    return parsed;
+  }
+
+  throw new Error(`Failed after 3 attempts: ${lastError}`);
+}</code></pre>
+        </div>
+      </div>
+
+      <div>
+        <div class="flex items-center gap-2 mb-3">
+          <span class="text-xs font-medium text-green-400 bg-green-500/10 px-2.5 py-1 rounded">After</span>
+          <span class="text-xs text-zinc-600">Schema + invariants</span>
+        </div>
+        <div class="glass rounded-xl p-5 h-full">
+          <pre><code class="language-typescript">import { enforce } from "llm-contract";
+import { z } from "zod";
+
+const Invoice = z.object({
+  vendor: z.string(),
+  invoiceNumber: z.string(),
+  date: z.string().regex(/^\d{4}-\d{2}-\d{2}$/),
+  lineItems: z.array(z.object({
+    description: z.string(),
+    quantity: z.number(),
+    unitPrice: z.number(),
+    amount: z.number(),
+  })),
+  subtotal: z.number(),
+  tax: z.number(),
+  total: z.number(),
+});
+
+async function extractInvoice(pdfText: string) {
+  return enforce(Invoice, async (attempt) => {
+    const res = await openai.chat.completions.create({
+      model: "gpt-4o",
+      messages: [
+        { role: "system", content: attempt.prompt },
+        { role: "user", content: pdfText },
+        ...attempt.fixes,
+      ],
+    });
+    return res.choices[0].message.content;
+  }, {
+    invariants: [
+      (d) => {
+        const sum = d.lineItems.reduce(
+          (s, i) => s + i.amount, 0
+        );
+        return Math.abs(sum - d.subtotal) < 0.01
+          || `line items sum to ${sum}, subtotal is ${d.subtotal}`;
+      },
+      (d) => Math.abs(d.subtotal + d.tax - d.total) < 0.01
+        || `subtotal + tax != total`,
+    ],
+  });
+}</code></pre>
+        </div>
+      </div>
+    </div>
+
+    <div class="gradient-border p-6">
+      <p class="text-white font-semibold mb-3">What changed</p>
+      <ul class="text-zinc-400 text-sm space-y-1.5">
+        <li>Schema validates every field — date format, nested array items, all number fields</li>
+        <li>Invariants enforce cross-field math the schema can't express</li>
+        <li><code class="text-zinc-300 bg-bg/60 px-1 py-0.5 rounded text-xs border border-white/[0.04]">clean</code> coerces <code class="text-zinc-300 bg-bg/60 px-1 py-0.5 rounded text-xs border border-white/[0.04]">"250.00"</code> to <code class="text-zinc-300 bg-bg/60 px-1 py-0.5 rounded text-xs border border-white/[0.04]">250</code> automatically</li>
+        <li>Repair messages are specific: <code class="text-zinc-300 bg-bg/60 px-1 py-0.5 rounded text-xs border border-white/[0.04]">line items sum to 400, but subtotal is 350</code></li>
+        <li>Return type is fully inferred from the Zod schema</li>
+      </ul>
+    </div>
+  </section>
+
+  <section id="classification" class="max-w-6xl mx-auto px-6 py-14 border-t border-white/[0.06] fade-up">
+    <h2 class="text-2xl font-bold text-white mb-2 tracking-tight">Ticket Classification</h2>
+    <p class="text-zinc-400 mb-8">Classify support tickets with constrained enums and bounded arrays.</p>
+
+    <div class="grid lg:grid-cols-2 gap-6 mb-6">
+      <div>
+        <div class="flex items-center gap-2 mb-3">
+          <span class="text-xs font-medium text-red-400 bg-red-500/10 px-2.5 py-1 rounded">Before</span>
+          <span class="text-xs text-zinc-600">Incomplete validation</span>
+        </div>
+        <div class="glass rounded-xl p-5 h-full">
+          <pre><code class="language-typescript">async function classifyTicket(ticket: string) {
+  const response = await openai.chat.completions.create({
+    model: "gpt-4o-mini",
+    messages: [{
+      role: "system",
+      content: `Classify this ticket as JSON:
+- category: "bug", "feature", "question", "billing"
+- priority: "low", "medium", "high", "critical"
+- tags: array of relevant tags (max 5)
+JSON only.`,
+    }, { role: "user", content: ticket }],
+  });
+
+  const raw = response.choices[0].message.content ?? "";
+  const cleaned = raw
+    .replace(/```json\n?/g, "")
+    .replace(/```/g, "").trim();
+  const parsed = JSON.parse(cleaned);
+
+  if (!["bug", "feature", "question", "billing"]
+    .includes(parsed.category)) {
+    throw new Error(`Invalid category: ${parsed.category}`);
+  }
+
+  // Priority validation missing
+  // Tags length check missing
+
+  return parsed;
+}</code></pre>
+        </div>
+      </div>
+
+      <div>
+        <div class="flex items-center gap-2 mb-3">
+          <span class="text-xs font-medium text-green-400 bg-green-500/10 px-2.5 py-1 rounded">After</span>
+          <span class="text-xs text-zinc-600">Complete validation</span>
+        </div>
+        <div class="glass rounded-xl p-5 h-full">
+          <pre><code class="language-typescript">import { enforce } from "llm-contract";
+import { z } from "zod";
+
+const Ticket = z.object({
+  category: z.enum([
+    "bug", "feature", "question", "billing",
+  ]),
+  priority: z.enum([
+    "low", "medium", "high", "critical",
+  ]),
+  tags: z.array(z.string()).max(5),
+});
+
+async function classifyTicket(ticket: string) {
+  return enforce(Ticket, async (attempt) => {
+    const res = await openai.chat.completions.create({
+      model: "gpt-4o-mini",
+      messages: [
+        { role: "system", content: attempt.prompt },
+        { role: "user", content: ticket },
+        ...attempt.fixes,
+      ],
+    });
+    return res.choices[0].message.content;
+  });
+}</code></pre>
+        </div>
+      </div>
+    </div>
+
+    <div class="gradient-border p-6">
+      <p class="text-white font-semibold mb-3">What changed</p>
+      <ul class="text-zinc-400 text-sm space-y-1.5">
+        <li>All enum values enforced at runtime — <code class="text-zinc-300 bg-bg/60 px-1 py-0.5 rounded text-xs border border-white/[0.04]">"urgent"</code> is caught and repaired, not silently accepted</li>
+        <li>Tags array capped at 5 by the schema</li>
+        <li>Priority validation is covered — no more forgotten checks</li>
+        <li>Auto-generated prompt always reflects the actual schema</li>
+      </ul>
+    </div>
+  </section>
+
+  <section class="max-w-6xl mx-auto px-6 py-20 border-t border-white/[0.06] fade-up">
+    <h2 class="text-2xl font-bold text-white mb-6 tracking-tight">The pattern</h2>
+    <p class="text-zinc-400 max-w-3xl mb-8">Every example follows the same shape:</p>
+
+    <div class="glass rounded-xl p-6 max-w-3xl">
+      <pre><code class="language-typescript">const result = await enforce(schema, async (attempt) => {
+  const { text } = await yourLLMCall({
+    system: attempt.prompt,    // from schema
+    messages: attempt.fixes,   // from previous failure
+  });
+  return text;
+}, {
+  invariants: [
+    // cross-field rules Zod can't express
+  ],
+  onAttempt: (event) => {
+    // observe every attempt — log, trace, alert
+  },
+});</code></pre>
+    </div>
+
+    <ul class="mt-6 space-y-2 text-sm text-zinc-500 max-w-3xl">
+      <li><code class="text-zinc-300 bg-surface px-1 py-0.5 rounded text-xs border border-border">schema</code> — Zod schema, single source of truth</li>
+      <li><code class="text-zinc-300 bg-surface px-1 py-0.5 rounded text-xs border border-border">attempt.prompt</code> — auto-generated format instructions</li>
+      <li><code class="text-zinc-300 bg-surface px-1 py-0.5 rounded text-xs border border-border">attempt.fixes</code> — targeted repair from previous failures</li>
+      <li><code class="text-zinc-300 bg-surface px-1 py-0.5 rounded text-xs border border-border">invariants</code> — cross-field checks that compound correctness</li>
+      <li>Works with any LLM provider — OpenAI, Anthropic, Vercel AI SDK, LangChain, or raw HTTP</li>
+    </ul>
+  </section>
+
+  <section class="max-w-6xl mx-auto px-6 py-14 border-t border-white/[0.06] fade-up">
+    <h2 class="text-2xl font-bold text-white mb-6 tracking-tight">Runnable examples</h2>
+    <p class="text-zinc-400 mb-6">Full example files with simulated failures to show the contract loop in action:</p>
+    <div class="grid sm:grid-cols-2 lg:grid-cols-3 gap-4">
+      <a href="https://github.com/operatorstack/llm-contract/blob/main/examples/extraction.ts" class="glass rounded-xl p-4 card-hover" target="_blank">
+        <p class="text-white text-sm font-medium">extraction.ts</p>
+        <p class="text-zinc-500 text-sm">Invoice extraction with math invariants</p>
+      </a>
+      <a href="https://github.com/operatorstack/llm-contract/blob/main/examples/classification.ts" class="glass rounded-xl p-4 card-hover" target="_blank">
+        <p class="text-white text-sm font-medium">classification.ts</p>
+        <p class="text-zinc-500 text-sm">Ticket classification with enums</p>
+      </a>
+      <a href="https://github.com/operatorstack/llm-contract/blob/main/examples/moderation.ts" class="glass rounded-xl p-4 card-hover" target="_blank">
+        <p class="text-white text-sm font-medium">moderation.ts</p>
+        <p class="text-zinc-500 text-sm">Content moderation with confidence gates</p>
+      </a>
+      <a href="https://github.com/operatorstack/llm-contract/blob/main/examples/scoring.ts" class="glass rounded-xl p-4 card-hover" target="_blank">
+        <p class="text-white text-sm font-medium">scoring.ts</p>
+        <p class="text-zinc-500 text-sm">Scoring with numeric constraints</p>
+      </a>
+      <a href="https://github.com/operatorstack/llm-contract/blob/main/examples/fallback.ts" class="glass rounded-xl p-4 card-hover" target="_blank">
+        <p class="text-white text-sm font-medium">fallback.ts</p>
+        <p class="text-zinc-500 text-sm">Graceful fallback on exhausted retries</p>
+      </a>
+      <a href="https://github.com/operatorstack/llm-contract/blob/main/examples/primitives.ts" class="glass rounded-xl p-4 card-hover" target="_blank">
+        <p class="text-white text-sm font-medium">primitives.ts</p>
+        <p class="text-zinc-500 text-sm">Using clean, check, fix, select individually</p>
+      </a>
+    </div>
+  </section>
+
+  <footer class="border-t border-white/[0.06] mt-8">
+    <div class="max-w-6xl mx-auto px-6 py-8 flex flex-col sm:flex-row items-center justify-between gap-4 text-sm text-zinc-600">
+      <span>llm-contract &middot; MIT License &middot; Preview release</span>
+      <div class="flex gap-6">
+        <a href="https://github.com/operatorstack/llm-contract" class="hover:text-zinc-300 transition" target="_blank">GitHub</a>
+        <a href="https://www.npmjs.com/package/llm-contract" class="hover:text-zinc-300 transition" target="_blank">npm</a>
+      </div>
+    </div>
+  </footer>
+
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/prism/1.29.0/prism.min.js"></script>
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/prism/1.29.0/components/prism-typescript.min.js"></script>
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/prism/1.29.0/components/prism-json.min.js"></script>
+  <script>
+    const observer = new IntersectionObserver((entries) => {
+      entries.forEach(entry => { if (entry.isIntersecting) { entry.target.classList.add('visible'); observer.unobserve(entry.target); } });
+    }, { threshold: 0.1 });
+    document.querySelectorAll('.fade-up').forEach(el => observer.observe(el));
+  </script>
+</body>
+</html>

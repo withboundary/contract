@@ -1,0 +1,297 @@
+<!DOCTYPE html>
+<html lang="en" class="scroll-smooth">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Observability — llm-contract</title>
+  <meta name="description" content="Wire onAttempt into Langfuse, OpenTelemetry, or any tracing backend. Get per-attempt observability with zero new dependencies.">
+  <script src="https://cdn.tailwindcss.com"></script>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet">
+  <link href="https://cdnjs.cloudflare.com/ajax/libs/prism/1.29.0/themes/prism-tomorrow.min.css" rel="stylesheet">
+  <script>
+    tailwind.config = {
+      theme: {
+        extend: {
+          fontFamily: { sans: ['Inter', 'sans-serif'], mono: ['JetBrains Mono', 'monospace'] },
+          colors: {
+            bg: '#09090b',
+            surface: '#18181b',
+            border: '#27272a',
+            accent: '#a78bfa',
+            'accent-blue': '#60a5fa',
+            muted: '#a1a1aa',
+          }
+        }
+      }
+    }
+  </script>
+  <style>
+    pre[class*="language-"] { margin: 0; border-radius: 0.75rem; background: #18181b !important; border: 1px solid #27272a; }
+    code[class*="language-"] { font-family: 'JetBrains Mono', monospace; font-size: 0.8125rem; }
+    .gradient-text { background: linear-gradient(135deg, #a78bfa 0%, #60a5fa 50%, #a78bfa 100%); -webkit-background-clip: text; -webkit-text-fill-color: transparent; background-clip: text; }
+    .glass { background: rgba(24, 24, 27, 0.6); backdrop-filter: blur(12px); -webkit-backdrop-filter: blur(12px); border: 1px solid rgba(39, 39, 42, 0.8); }
+    @keyframes fadeUp { from { opacity: 0; transform: translateY(20px); } to { opacity: 1; transform: translateY(0); } }
+    .fade-up { opacity: 0; }
+    .fade-up.visible { animation: fadeUp 0.6s ease-out forwards; }
+  </style>
+</head>
+<body class="bg-bg text-zinc-300 font-sans antialiased">
+
+  <nav class="sticky top-0 z-50 bg-bg/70 backdrop-blur-xl border-b border-white/[0.06]">
+    <div class="max-w-6xl mx-auto px-6 h-14 flex items-center justify-between">
+      <a href="index.html" class="font-bold text-lg gradient-text">llm-contract</a>
+      <div class="flex items-center gap-6 text-sm text-zinc-500">
+        <a href="index.html#repairs" class="hover:text-zinc-200 transition">Repairs</a>
+        <a href="primitives.html" class="hover:text-zinc-200 transition">Primitives</a>
+        <a href="invariants.html" class="hover:text-zinc-200 transition">Invariants</a>
+        <a href="observability.html" class="text-white">Observability</a>
+        <a href="api.html" class="hover:text-zinc-200 transition">API</a>
+        <a href="examples.html" class="hover:text-zinc-200 transition">Examples</a>
+        <a href="https://github.com/operatorstack/llm-contract" class="hover:text-zinc-200 transition" target="_blank">GitHub</a>
+      </div>
+    </div>
+  </nav>
+
+  <section class="max-w-6xl mx-auto px-6 pt-24 pb-12">
+    <h1 class="text-3xl sm:text-4xl font-extrabold text-white mb-4 tracking-tight"><span class="gradient-text">Observability</span></h1>
+    <p class="text-zinc-400 text-lg max-w-3xl">
+      Every attempt is observable. Wire the <code class="text-zinc-300 bg-surface px-1.5 py-0.5 rounded text-sm border border-border">onAttempt</code> hook into your existing tracing stack — no new dependencies, no adapters.
+    </p>
+  </section>
+
+  <section class="max-w-6xl mx-auto px-6 py-14 border-t border-white/[0.06] fade-up">
+    <h2 class="text-2xl font-bold text-white mb-6 tracking-tight">The onAttempt hook</h2>
+    <p class="text-zinc-400 max-w-3xl mb-6">
+      Called after every attempt — pass or fail. Gives you structured data about what happened, what category of failure it was, and what specific issues were found.
+    </p>
+    <div class="glass rounded-xl p-5 mb-6">
+      <pre><code class="language-typescript">enforce(schema, runFn, {
+  onAttempt: (event) => {
+    console.log(`Attempt ${event.number}: ${event.ok ? "pass" : "fail"}`);
+
+    if (!event.ok) {
+      console.log(`  Category: ${event.category}`);
+      console.log(`  Issues: ${event.issues.join(", ")}`);
+      console.log(`  Duration: ${event.durationMS}ms`);
+    }
+  },
+});</code></pre>
+    </div>
+
+    <h3 class="text-lg font-semibold text-white mb-4">AttemptEvent fields</h3>
+    <div class="overflow-x-auto">
+      <table class="w-full text-sm">
+        <thead>
+          <tr class="border-b border-white/[0.08] text-left">
+            <th class="py-3 pr-6 text-white font-medium">Field</th>
+            <th class="py-3 pr-6 text-white font-medium">Type</th>
+            <th class="py-3 text-white font-medium">Description</th>
+          </tr>
+        </thead>
+        <tbody class="text-zinc-400">
+          <tr class="border-b border-white/[0.04]"><td class="py-3 pr-6 font-mono text-xs text-accent">ok</td><td class="py-3 pr-6 font-mono text-xs">boolean</td><td class="py-3">Whether this attempt passed validation</td></tr>
+          <tr class="border-b border-white/[0.04]"><td class="py-3 pr-6 font-mono text-xs text-accent">number</td><td class="py-3 pr-6 font-mono text-xs">number</td><td class="py-3">Attempt number (1-indexed)</td></tr>
+          <tr class="border-b border-white/[0.04]"><td class="py-3 pr-6 font-mono text-xs text-accent">category</td><td class="py-3 pr-6 font-mono text-xs">FailureCategory | undefined</td><td class="py-3">Failure type (undefined on success)</td></tr>
+          <tr class="border-b border-white/[0.04]"><td class="py-3 pr-6 font-mono text-xs text-accent">issues</td><td class="py-3 pr-6 font-mono text-xs">string[]</td><td class="py-3">Specific violation messages</td></tr>
+          <tr><td class="py-3 pr-6 font-mono text-xs text-accent">durationMS</td><td class="py-3 pr-6 font-mono text-xs">number</td><td class="py-3">How long this attempt took</td></tr>
+        </tbody>
+      </table>
+    </div>
+  </section>
+
+  <section class="max-w-6xl mx-auto px-6 py-14 border-t border-white/[0.06] fade-up">
+    <h2 class="text-2xl font-bold text-white mb-6 tracking-tight">Built-in failure categories</h2>
+    <p class="text-zinc-400 max-w-3xl mb-6">
+      Every failed attempt is classified into one of 8 categories. Each gets a targeted repair message — not generic "try again."
+    </p>
+    <div class="overflow-x-auto">
+      <table class="w-full text-sm">
+        <thead>
+          <tr class="border-b border-white/[0.08] text-left">
+            <th class="py-3 pr-6 text-white font-medium">Category</th>
+            <th class="py-3 pr-6 text-white font-medium">What happened</th>
+            <th class="py-3 text-white font-medium">Default repair</th>
+          </tr>
+        </thead>
+        <tbody class="text-zinc-400">
+          <tr class="border-b border-white/[0.04]"><td class="py-3 pr-6 font-mono text-xs text-accent">EMPTY_RESPONSE</td><td class="py-3 pr-6">Model returned nothing</td><td class="py-3">Ask for JSON matching the schema</td></tr>
+          <tr class="border-b border-white/[0.04]"><td class="py-3 pr-6 font-mono text-xs text-accent">REFUSAL</td><td class="py-3 pr-6">Model declined the task</td><td class="py-3">Redirect to structured data task</td></tr>
+          <tr class="border-b border-white/[0.04]"><td class="py-3 pr-6 font-mono text-xs text-accent">NO_JSON</td><td class="py-3 pr-6">No JSON found in response</td><td class="py-3">Ask for JSON only, no prose</td></tr>
+          <tr class="border-b border-white/[0.04]"><td class="py-3 pr-6 font-mono text-xs text-accent">TRUNCATED</td><td class="py-3 pr-6">JSON cut off mid-response</td><td class="py-3">Ask for shorter, complete response</td></tr>
+          <tr class="border-b border-white/[0.04]"><td class="py-3 pr-6 font-mono text-xs text-accent">PARSE_ERROR</td><td class="py-3 pr-6">Malformed JSON</td><td class="py-3">Ask for strictly valid JSON</td></tr>
+          <tr class="border-b border-white/[0.04]"><td class="py-3 pr-6 font-mono text-xs text-accent">VALIDATION_ERROR</td><td class="py-3 pr-6">Valid JSON, failed schema</td><td class="py-3">List specific Zod errors</td></tr>
+          <tr class="border-b border-white/[0.04]"><td class="py-3 pr-6 font-mono text-xs text-accent">INVARIANT_ERROR</td><td class="py-3 pr-6">Correct types, failed constraints</td><td class="py-3">List specific violations</td></tr>
+          <tr><td class="py-3 pr-6 font-mono text-xs text-accent">RUN_ERROR</td><td class="py-3 pr-6">Function threw an exception</td><td class="py-3">Ask to try again</td></tr>
+        </tbody>
+      </table>
+    </div>
+  </section>
+
+  <section class="max-w-6xl mx-auto px-6 py-14 border-t border-white/[0.06] fade-up">
+    <h2 class="text-2xl font-bold text-white mb-6 tracking-tight">Custom repair overrides</h2>
+    <p class="text-zinc-400 max-w-3xl mb-6">
+      Override the repair message for any category, or disable retry entirely by passing <code class="text-zinc-300 bg-surface px-1 py-0.5 rounded text-sm border border-border">false</code>.
+    </p>
+    <div class="glass rounded-xl p-5">
+      <pre><code class="language-typescript">enforce(schema, run, {
+  repairs: {
+    REFUSAL: (detail) => [{
+      role: "user",
+      content: "This is an approved data extraction task. Return the JSON.",
+    }],
+    TRUNCATED: false, // stop immediately, don't retry
+  },
+});</code></pre>
+    </div>
+  </section>
+
+  <section class="max-w-6xl mx-auto px-6 py-14 border-t border-white/[0.06] fade-up">
+    <h2 class="text-2xl font-bold text-white mb-2 tracking-tight">Langfuse</h2>
+    <p class="text-zinc-400 max-w-3xl mb-6">
+      Trace each enforce call and every attempt as a Langfuse observation. See which invariants fire, how often, and whether prompt changes reduce them.
+    </p>
+    <div class="glass rounded-xl p-5 mb-6">
+      <pre><code class="language-typescript">import { startActiveObservation, startObservation } from "@langfuse/tracing";
+
+const result = await startActiveObservation("enforce-sentiment", async () => {
+  return enforce(schema, async (attempt) => {
+    const gen = startObservation(
+      `llm-call-${attempt.number}`,
+      { model: "gpt-4o-mini", input: attempt.prompt },
+      { asType: "generation" },
+    );
+    const res = await openai.chat.completions.create({ /* ... */ });
+    gen.update({ output: res.choices[0].message.content }).end();
+    return res.choices[0].message.content;
+  }, {
+    onAttempt: (event) => {
+      const span = startObservation(`attempt-${event.number}`, {
+        output: { ok: event.ok, category: event.category, issues: event.issues },
+      });
+      span.end();
+    },
+  });
+});</code></pre>
+    </div>
+    <div class="glass rounded-xl p-5">
+      <p class="text-xs text-zinc-500 uppercase tracking-wider mb-3 font-medium">What you see in Langfuse</p>
+      <div class="font-mono text-sm space-y-1">
+        <p class="text-white">Trace: enforce-sentiment</p>
+        <p class="text-zinc-500 pl-4">&#9500;&#9472; Generation: llm-call-1 <span class="text-zinc-600">(gpt-4o-mini)</span></p>
+        <p class="text-red-400 pl-4">&#9500;&#9472; Span: attempt-1 <span class="text-red-400/70">{ category: "INVARIANT_ERROR", issues: ["confidence too low"] }</span></p>
+        <p class="text-zinc-500 pl-4">&#9500;&#9472; Generation: llm-call-2 <span class="text-zinc-600">(gpt-4o-mini)</span></p>
+        <p class="text-green-400 pl-4">&#9492;&#9472; Span: attempt-2 <span class="text-green-400/70">{ ok: true }</span></p>
+      </div>
+    </div>
+  </section>
+
+  <section class="max-w-6xl mx-auto px-6 py-14 border-t border-white/[0.06] fade-up">
+    <h2 class="text-2xl font-bold text-white mb-2 tracking-tight">OpenTelemetry</h2>
+    <p class="text-zinc-400 max-w-3xl mb-6">
+      Works with any OTLP backend — Datadog, Grafana, Honeycomb, Jaeger. Each attempt becomes a span with attributes you can query and dashboard.
+    </p>
+    <div class="glass rounded-xl p-5 mb-6">
+      <pre><code class="language-typescript">import { trace } from "@opentelemetry/api";
+
+const tracer = trace.getTracer("llm-contract");
+
+const result = await tracer.startActiveSpan("enforce", async (rootSpan) => {
+  const res = await enforce(schema, runFn, {
+    onAttempt: (event) => {
+      const span = tracer.startSpan(`attempt-${event.number}`);
+      span.setAttribute("attempt.ok", event.ok);
+      span.setAttribute("attempt.category", event.category ?? "none");
+      span.setAttribute("attempt.issues", event.issues.join("; "));
+      span.setAttribute("attempt.durationMS", event.durationMS);
+      span.end();
+    },
+  });
+  rootSpan.setAttribute("result.ok", res.ok);
+  rootSpan.setAttribute("result.attempts", res.ok ? res.attempts : -1);
+  rootSpan.end();
+  return res;
+});</code></pre>
+    </div>
+    <div class="glass rounded-xl p-5">
+      <p class="text-xs text-zinc-500 uppercase tracking-wider mb-3 font-medium">What you can query</p>
+      <ul class="text-sm text-zinc-400 space-y-1">
+        <li><code class="text-zinc-300 bg-bg/60 px-1 py-0.5 rounded text-xs border border-white/[0.04]">attempt.category = "INVARIANT_ERROR"</code> — filter by failure type</li>
+        <li><code class="text-zinc-300 bg-bg/60 px-1 py-0.5 rounded text-xs border border-white/[0.04]">result.attempts > 1</code> — find schemas that need retries</li>
+        <li><code class="text-zinc-300 bg-bg/60 px-1 py-0.5 rounded text-xs border border-white/[0.04]">attempt.issues CONTAINS "end must be"</code> — track specific invariants</li>
+      </ul>
+    </div>
+  </section>
+
+  <section class="max-w-6xl mx-auto px-6 py-14 border-t border-white/[0.06] fade-up">
+    <h2 class="text-2xl font-bold text-white mb-2 tracking-tight">Vercel AI SDK</h2>
+    <p class="text-zinc-400 max-w-3xl mb-6">
+      Use <code class="text-zinc-300 bg-surface px-1 py-0.5 rounded text-sm border border-border">enforce</code> with <code class="text-zinc-300 bg-surface px-1 py-0.5 rounded text-sm border border-border">generateText</code> for invariants and targeted repair on top of your existing Vercel AI SDK setup. Replaces <code class="text-zinc-300 bg-surface px-1 py-0.5 rounded text-sm border border-border">generateObject</code> when you need cross-field validation.
+    </p>
+    <div class="glass rounded-xl p-5 mb-6">
+      <pre><code class="language-typescript">import { generateText } from "ai";
+import { openai } from "@ai-sdk/openai";
+
+const result = await enforce(schema, async (attempt) => {
+  const { text } = await generateText({
+    model: openai("gpt-4o-mini"),
+    messages: [
+      { role: "system", content: attempt.prompt },
+      { role: "user", content: input },
+      ...attempt.fixes,
+    ],
+  });
+  return text;
+}, {
+  invariants: [
+    (d) => Math.abs(d.subtotal + d.tax - d.total) < 0.01
+      || `subtotal + tax != total`,
+  ],
+});</code></pre>
+    </div>
+
+    <div class="glass rounded-xl p-6">
+      <p class="text-white font-semibold mb-3">Why use enforce instead of generateObject?</p>
+      <div class="grid sm:grid-cols-2 gap-4 text-sm">
+        <div>
+          <p class="text-zinc-500 mb-2"><code class="text-zinc-300 bg-bg/60 px-1 py-0.5 rounded text-xs border border-white/[0.04]">generateObject</code></p>
+          <ul class="text-zinc-500 space-y-1">
+            <li>Validates schema</li>
+            <li>Retries with same prompt</li>
+            <li>No cross-field checks</li>
+            <li>No per-attempt hooks</li>
+          </ul>
+        </div>
+        <div>
+          <p class="text-accent mb-2"><code class="text-zinc-300 bg-bg/60 px-1 py-0.5 rounded text-xs border border-white/[0.04]">enforce</code></p>
+          <ul class="text-zinc-400 space-y-1">
+            <li>Validates schema + invariants</li>
+            <li>Retries with targeted repair</li>
+            <li>Cross-field validation</li>
+            <li>Per-attempt observability</li>
+          </ul>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <footer class="border-t border-white/[0.06] mt-8">
+    <div class="max-w-6xl mx-auto px-6 py-8 flex flex-col sm:flex-row items-center justify-between gap-4 text-sm text-zinc-600">
+      <span>llm-contract &middot; MIT License &middot; Preview release</span>
+      <div class="flex gap-6">
+        <a href="https://github.com/operatorstack/llm-contract" class="hover:text-zinc-300 transition" target="_blank">GitHub</a>
+        <a href="https://www.npmjs.com/package/llm-contract" class="hover:text-zinc-300 transition" target="_blank">npm</a>
+      </div>
+    </div>
+  </footer>
+
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/prism/1.29.0/prism.min.js"></script>
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/prism/1.29.0/components/prism-typescript.min.js"></script>
+  <script>
+    const observer = new IntersectionObserver((entries) => {
+      entries.forEach(entry => { if (entry.isIntersecting) { entry.target.classList.add('visible'); observer.unobserve(entry.target); } });
+    }, { threshold: 0.1 });
+    document.querySelectorAll('.fade-up').forEach(el => observer.observe(el));
+  </script>
+</body>
+</html>
