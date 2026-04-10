@@ -1,6 +1,10 @@
 node_modules/
 dist/
 *.tsbuildinfo
+src/**/*.js
+src/**/*.d.ts
+src/**/*.js.map
+examples/**/*.js
 .DS_Store
 coverage/
 .env
