@@ -1,5 +1,5 @@
 /**
- * Invoice extraction with cross-field math invariants.
+ * Invoice extraction with cross-field math rules.
  *
  * Simulates realistic LLM failures:
  *   Attempt 1 — markdown fences + string-typed numbers (cleaned automatically)
@@ -84,7 +84,7 @@ function simulateLLM(attemptNumber: number): string {
 async function main() {
   const contract = defineContract({
     schema: InvoiceSchema,
-    invariants: [
+    rules: [
       (d: Invoice) => d.lineItems.length > 0 || "invoice must have at least one line item",
       (d: Invoice) => {
         const sum = d.lineItems.reduce((s, i) => s + i.amount, 0);
@@ -107,7 +107,7 @@ async function main() {
     },
   });
 
-  const result = await contract.run(async (attempt) => simulateLLM(attempt.number));
+  const result = await contract.accept(async (attempt) => simulateLLM(attempt.attempt));
 
   console.log();
   if (result.ok) {

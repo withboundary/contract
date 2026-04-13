@@ -2,7 +2,7 @@ import { describe, it, expect } from "vitest";
 import { z } from "zod";
 import { clean, enforce, repair, verify } from "../src/index.js";
 import { select } from "../src/utils/select.js";
-import type { AttemptContext, Message } from "../src/index.js";
+import type { ContractAttempt, Message } from "../src/index.js";
 
 function asMessages(result: Message[] | false): Message[] {
   if (result === false) {
@@ -59,7 +59,7 @@ Let me know if you need anything else!`;
     });
 
     let attemptNum = 0;
-    const result = await enforce(ScoreSchema, async (attempt: AttemptContext) => {
+    const result = await enforce(ScoreSchema, async (attempt: ContractAttempt) => {
       attemptNum++;
       if (attemptNum === 1) {
         return '{"score": "85", "grade": "excellent"}';

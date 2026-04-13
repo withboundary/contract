@@ -1,5 +1,5 @@
 /**
- * Content moderation with policy consistency invariants.
+ * Content moderation with policy consistency rules.
  *
  * Simulates realistic LLM failures:
  *   Attempt 1 — prose-wrapped JSON ("Here is my analysis: {...}")
@@ -55,7 +55,7 @@ Let me know if you need anything else!`;
 async function main() {
   const contract = defineContract({
     schema: ModerationSchema,
-    invariants: [
+    rules: [
       (d: Moderation) =>
         d.confidence >= 0.7 || d.action !== "block"
           || `cannot block with confidence ${d.confidence} (minimum 0.7)`,
@@ -76,7 +76,7 @@ async function main() {
     },
   });
 
-  const result = await contract.run(async (attempt) => simulateLLM(attempt.number));
+  const result = await contract.accept(async (attempt) => simulateLLM(attempt.attempt));
 
   console.log();
   if (result.ok) {

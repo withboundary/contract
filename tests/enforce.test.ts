@@ -1,7 +1,7 @@
 import { describe, it, expect } from "vitest";
 import { z } from "zod";
 import { createConsoleLogger, defineContract, enforce } from "../src/index.js";
-import type { AttemptContext, AttemptEvent, ContractLogger } from "../src/index.js";
+import type { ContractAttempt, AttemptEvent, ContractLogger } from "../src/index.js";
 
 const Schema = z.object({
   sentiment: z.enum(["positive", "negative", "neutral"]),
@@ -37,7 +37,7 @@ describe("enforce", () => {
 
   it("repairs and succeeds on retry", async () => {
     let callCount = 0;
-    const result = await enforce(Schema, async (attempt: AttemptContext) => {
+    const result = await enforce(Schema, async (attempt: ContractAttempt) => {
       callCount++;
       if (callCount === 1) {
         return '{"sentiment": "great", "confidence": 0.9}';

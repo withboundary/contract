@@ -54,7 +54,7 @@ async function main() {
   const contract = defineContract({
     schema: TicketSchema,
     debug: true,
-    invariants: [
+    rules: [
       (t: Ticket) =>
         t.tags.length > 0 || "must have at least one tag",
       (t: Ticket) =>
@@ -68,7 +68,7 @@ async function main() {
     },
   });
 
-  const result = await contract.run(async (attempt) => simulateLLM(attempt.number));
+  const result = await contract.accept(async (attempt) => simulateLLM(attempt.attempt));
 
   console.log();
   if (result.ok) {

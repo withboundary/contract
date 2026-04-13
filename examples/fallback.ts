@@ -45,7 +45,7 @@ async function analyzeCheap() {
   const contract = defineContract({
     schema: AnalysisSchema,
     retry: { maxAttempts: 2 },
-    invariants: [
+    rules: [
       (d: Analysis) =>
         d.risks.length > 0 || d.recommendation === "approve"
           || "non-approve recommendation must cite at least one risk",
@@ -56,14 +56,14 @@ async function analyzeCheap() {
       console.log(`  Attempt ${event.number}: ${status} (${event.durationMS}ms)${issues}`);
     },
   });
-  return contract.run(async (attempt) => simulateCheapModel(attempt.number));
+  return contract.accept(async (attempt) => simulateCheapModel(attempt.attempt));
 }
 
 async function analyzeStrong() {
   console.log("--- Strong model ---");
   const contract = defineContract({
     schema: AnalysisSchema,
-    invariants: [
+    rules: [
       (d: Analysis) =>
         d.risks.length > 0 || d.recommendation === "approve"
           || "non-approve recommendation must cite at least one risk",
@@ -74,7 +74,7 @@ async function analyzeStrong() {
       console.log(`  Attempt ${event.number}: ${status} (${event.durationMS}ms)${issues}`);
     },
   });
-  return contract.run(async (attempt) => simulateStrongModel(attempt.number));
+  return contract.accept(async (attempt) => simulateStrongModel(attempt.attempt));
 }
 
 async function main() {

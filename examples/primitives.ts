@@ -3,7 +3,8 @@
  *
  *   npx tsx examples/primitives.ts
  */
-import { clean, repair, select, verify } from "../src/index.js";
+import { clean, repair, verify } from "../src/index.js";
+import { select } from "../src/utils/select.js";
 import { z } from "zod";
 
 // --- clean: extract JSON from messy LLM output ---

@@ -1,5 +1,5 @@
 /**
- * Lead scoring with tier/score alignment invariants.
+ * Lead scoring with tier/score alignment rules.
  *
  * Simulates realistic LLM failures:
  *   Attempt 1 — truncated JSON (cut off mid-response)
@@ -51,7 +51,7 @@ function simulateLLM(attemptNumber: number): string {
 async function main() {
   const contract = defineContract({
     schema: LeadSchema,
-    invariants: [
+    rules: [
       (d: Lead) =>
         d.tier !== "hot" || d.score >= 70
           || `tier is "hot" but score is ${d.score} (minimum 70 for hot)`,
@@ -71,7 +71,7 @@ async function main() {
     },
   });
 
-  const result = await contract.run(async (attempt) => simulateLLM(attempt.number));
+  const result = await contract.accept(async (attempt) => simulateLLM(attempt.attempt));
 
   console.log();
   if (result.ok) {
