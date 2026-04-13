@@ -3,7 +3,7 @@ import type {
   AttemptDetail,
   FailureCategory,
   Message,
-  Result,
+  ContractResult,
   RunFn,
 } from "./types.js";
 import type { NormalizedContractOptions } from "./normalizeOptions.js";
@@ -25,7 +25,7 @@ export async function runContract<T>(
   schema: ZodType<T>,
   run: RunFn,
   options: NormalizedContractOptions<T>,
-): Promise<Result<T>> {
+): Promise<ContractResult<T>> {
   const logger = options.logger;
   let schemaInstructions = buildInstructions(schema);
   if (options.instructions.suffix) {
@@ -40,7 +40,7 @@ export async function runContract<T>(
   const totalStart = Date.now();
   emitLogger(logger, "onRunStart", {
     maxAttempts: options.retry.maxAttempts,
-    hasInvariants: Boolean(options.invariants && options.invariants.length > 0),
+    hasRules: Boolean(options.rules && options.rules.length > 0),
     retry: options.retry,
   });
 
@@ -49,9 +49,10 @@ export async function runContract<T>(
     await sleep(delay);
 
     const attemptContext = {
+      attempt: attemptNum,
+      maxAttempts: options.retry.maxAttempts,
       instructions: schemaInstructions,
       repairs: currentRepairs,
-      number: attemptNum,
       previousError,
       previousCategory,
     };
@@ -141,7 +142,7 @@ export async function runContract<T>(
       continue;
     }
 
-    const verifyResult = verify(cleaned, schema, options.invariants);
+    const verifyResult = verify(cleaned, schema, options.rules);
     if (!isFailureResult(verifyResult)) {
       const durationMs = Date.now() - start;
       emitAttempt(options, attemptNum, true, raw, [], durationMs);
@@ -213,7 +214,7 @@ export async function runContract<T>(
 }
 
 function isFailureResult<T>(
-  result: Result<T>,
+  result: ContractResult<T>,
 ): result is { ok: false; error: { attempts: AttemptDetail[]; message: string } } {
   return result.ok === false;
 }

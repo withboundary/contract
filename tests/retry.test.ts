@@ -3,7 +3,7 @@ import {
   computeRetryDelay,
   DEFAULT_RETRY_POLICY,
   resolveRetryPolicy,
-} from "../src/index.js";
+} from "../src/engine/retry.js";
 
 describe("resolveRetryPolicy", () => {
   it("returns defaults when no options given", () => {

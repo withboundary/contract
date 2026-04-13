@@ -1,13 +1,13 @@
 import type { ZodError, ZodType } from "zod";
-import type { Invariant, Result } from "../contract/types.js";
+import type { Rule, ContractResult } from "../contract/types.js";
 import { createAttemptDetail, createContractError, failure } from "../result/failure.js";
 import { success } from "../result/success.js";
 
 export function verify<T>(
   data: unknown,
   schema: ZodType<T>,
-  invariants?: Invariant<T>[],
-): Result<T> {
+  rules?: Rule<T>[],
+): ContractResult<T> {
   const parseResult = schema.safeParse(data);
 
   if (!parseResult.success) {
@@ -23,21 +23,21 @@ export function verify<T>(
 
   const typed = parseResult.data;
 
-  if (invariants && invariants.length > 0) {
-    const invariantIssues: string[] = [];
+  if (rules && rules.length > 0) {
+    const ruleIssues: string[] = [];
 
-    for (const invariant of invariants) {
-      const result = invariant(typed);
+    for (const rule of rules) {
+      const result = rule(typed);
       if (result !== true) {
-        invariantIssues.push(result);
+        ruleIssues.push(result);
       }
     }
 
-    if (invariantIssues.length > 0) {
+    if (ruleIssues.length > 0) {
       const detail = createAttemptDetail(
         typeof data === "string" ? data : JSON.stringify(data),
         data,
-        invariantIssues,
+        ruleIssues,
         "INVARIANT_ERROR",
       );
       return failure(createContractError([detail]));

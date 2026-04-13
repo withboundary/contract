@@ -1,6 +1,6 @@
 import { describe, it, expect } from "vitest";
 import { z } from "zod";
-import { select } from "../src/index.js";
+import { select } from "../src/utils/select.js";
 
 describe("select", () => {
   it("picks only schema-defined keys", () => {

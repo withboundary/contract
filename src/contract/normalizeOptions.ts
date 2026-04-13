@@ -4,7 +4,7 @@ import { createConsoleLogger } from "../logger/createConsoleLogger.js";
 import type { ContractLogger } from "../logger/types.js";
 
 export interface NormalizedContractOptions<T> {
-  invariants?: ContractOptions<T>["invariants"];
+  rules?: ContractOptions<T>["rules"];
   repairs?: ContractOptions<T>["repairs"];
   retry: RetryPolicy;
   instructions: {
@@ -18,7 +18,7 @@ export function normalizeOptions<T>(
   options?: ContractOptions<T>,
 ): NormalizedContractOptions<T> {
   return {
-    invariants: options?.invariants,
+    rules: options?.rules,
     repairs: options?.repairs,
     retry: {
       maxAttempts: options?.retry?.maxAttempts ?? DEFAULT_RETRY_POLICY.maxAttempts,
@@ -42,7 +42,7 @@ export function mergeOptions<T>(
   }
 
   return normalizeOptions({
-    invariants: override?.invariants ?? base?.invariants,
+    rules: override?.rules ?? base?.rules,
     repairs: override?.repairs ?? base?.repairs,
     retry: {
       maxAttempts:

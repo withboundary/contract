@@ -1,51 +1,37 @@
+// ── Primary API ──────────────────────────────────────────────────────────────
 export { defineContract } from "./contract/defineContract.js";
 export { enforce } from "./contract/enforce.js";
 
+// ── Engine primitives ────────────────────────────────────────────────────────
 export { clean } from "./engine/clean.js";
-export { verify, formatZodError } from "./engine/verify.js";
+export { verify } from "./engine/verify.js";
 export { repair } from "./engine/repair.js";
 export { instructions } from "./engine/instructions.js";
 export { classify } from "./engine/classify.js";
-export {
-  DEFAULT_RETRY_POLICY,
-  resolveRetryPolicy,
-  computeRetryDelay,
-  sleep,
-} from "./engine/retry.js";
 
-export { select } from "./utils/select.js";
+// ── Observability ────────────────────────────────────────────────────────────
 export { createConsoleLogger } from "./logger/createConsoleLogger.js";
 
-export {
-  failure,
-  createAttemptDetail,
-  createContractError,
-  ContractValidationError,
-} from "./result/failure.js";
-export { success } from "./result/success.js";
-
+// ── Types ────────────────────────────────────────────────────────────────────
 export type {
-  AttemptContext,
+  ContractAttempt,
   AttemptDetail,
   AttemptEvent,
   AttemptHook,
-  Contract,
+  ContractConfig,
   ContractError,
   ContractOptions,
-  DefineContractInput,
-  EnforceOptions,
-  Failure,
+  ContractResult,
+  DefinedContract,
   FailureCategory,
   InstructionsOptions,
-  Invariant,
   Message,
   RepairFn,
-  Result,
   RetryBackoff,
   RetryOptions,
   RetryPolicy,
+  Rule,
   RunFn,
-  Success,
 } from "./contract/types.js";
 
 export type { ContractLogger, ConsoleLoggerOptions } from "./logger/types.js";

@@ -160,7 +160,7 @@ describe("enforce", () => {
     }
   });
 
-  it("supports custom invariants with INVARIANT_ERROR category", async () => {
+  it("supports custom rules with INVARIANT_ERROR category", async () => {
     const result = await enforce(
       Schema,
       async () => {
@@ -168,7 +168,7 @@ describe("enforce", () => {
       },
       {
         retry: { maxAttempts: 1 },
-        invariants: [
+        rules: [
           (d) => d.confidence >= 0.5 || "confidence too low",
         ],
       },
@@ -345,7 +345,7 @@ describe("enforce", () => {
     let receivedInstructions = "";
     let attempts = 0;
 
-    const result = await contract.run(async (attempt) => {
+    const result = await contract.accept(async (attempt) => {
       attempts++;
       receivedInstructions = attempt.instructions;
       if (attempts === 1) {

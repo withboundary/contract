@@ -28,15 +28,16 @@ export interface ContractError {
   attempts: AttemptDetail[];
 }
 
-export interface AttemptContext {
+export interface ContractAttempt {
+  attempt: number;
+  maxAttempts: number;
   instructions: string;
   repairs: Message[];
-  number: number;
   previousError?: ContractError;
   previousCategory?: FailureCategory;
 }
 
-export type Invariant<T> = (data: T) => true | string;
+export type Rule<T> = (data: T) => true | string;
 export type RepairFn = (detail: AttemptDetail) => Message[];
 
 export interface AttemptEvent {
@@ -69,7 +70,7 @@ export interface InstructionsOptions {
 }
 
 export interface ContractOptions<T = unknown> {
-  invariants?: Invariant<T>[];
+  rules?: Rule<T>[];
   repairs?: Partial<Record<FailureCategory, RepairFn | false>>;
   retry?: RetryOptions;
   instructions?: InstructionsOptions;
@@ -78,9 +79,9 @@ export interface ContractOptions<T = unknown> {
   debug?: boolean;
 }
 
-export type RunFn = (attempt: AttemptContext) => Promise<string | null>;
+export type RunFn = (attempt: ContractAttempt) => Promise<string | null>;
 
-export type Result<T> = Success<T> | Failure;
+export type ContractResult<T> = Success<T> | Failure;
 
 export interface Success<T> {
   ok: true;
@@ -95,15 +96,13 @@ export interface Failure {
   error: ContractError;
 }
 
-export interface Contract<T> {
-  run: (
-    runFn: RunFn,
+export interface DefinedContract<T> {
+  accept: (
+    run: RunFn,
     runtimeOptions?: ContractOptions<T>,
-  ) => Promise<Result<T>>;
+  ) => Promise<ContractResult<T>>;
 }
 
-export interface DefineContractInput<T> extends ContractOptions<T> {
+export interface ContractConfig<T> extends ContractOptions<T> {
   schema: ZodType<T>;
 }
-
-export type EnforceOptions<T> = ContractOptions<T>;

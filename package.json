@@ -1,7 +1,7 @@
 {
-  "name": "llm-contract",
-  "version": "0.1.0",
-  "description": "Typed contracts for LLM calls. Validate, repair, retry.",
+  "name": "@boundary/contract",
+  "version": "1.0.0",
+  "description": "Make LLM outputs correct, not just valid. Schema + rules + auto-repair.",
   "type": "module",
   "main": "./dist/index.js",
   "types": "./dist/index.d.ts",
@@ -37,11 +37,17 @@
   "keywords": [
     "llm",
     "structured-output",
-    "zod",
+    "correctness",
     "validation",
     "openai",
     "anthropic",
-    "contract"
+    "zod",
+    "json-schema",
+    "contract",
+    "rules",
+    "repair",
+    "retry",
+    "boundary"
   ],
   "license": "MIT",
   "engines": {

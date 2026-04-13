@@ -1,14 +1,14 @@
-import type { Contract, DefineContractInput } from "./types.js";
+import type { ContractConfig, DefinedContract } from "./types.js";
 import { mergeOptions } from "./normalizeOptions.js";
 import { runContract } from "./runContract.js";
 
-export function defineContract<T>(input: DefineContractInput<T>): Contract<T> {
-  const { schema, ...definitionOptions } = input;
+export function defineContract<T>(config: ContractConfig<T>): DefinedContract<T> {
+  const { schema, ...definitionOptions } = config;
 
   return {
-    run(runFn, runtimeOptions) {
+    accept(run, runtimeOptions) {
       const options = mergeOptions(definitionOptions, runtimeOptions);
-      return runContract(schema, runFn, options);
+      return runContract(schema, run, options);
     },
   };
 }

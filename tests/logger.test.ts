@@ -167,7 +167,7 @@ describe("logger", () => {
         }),
       });
 
-      const result = await contract.run(async () => {
+      const result = await contract.accept(async () => {
         return '{"sentiment":"negative","confidence":0.9}';
       });
 

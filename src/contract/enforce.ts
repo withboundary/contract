@@ -1,12 +1,12 @@
 import type { ZodType } from "zod";
 import { defineContract } from "./defineContract.js";
-import type { EnforceOptions, Result, RunFn } from "./types.js";
+import type { ContractOptions, ContractResult, RunFn } from "./types.js";
 
 export function enforce<T>(
   schema: ZodType<T>,
   runFn: RunFn,
-  options?: EnforceOptions<T>,
-): Promise<Result<T>> {
+  options?: ContractOptions<T>,
+): Promise<ContractResult<T>> {
   const contract = defineContract({ schema, ...(options ?? {}) });
-  return contract.run(runFn);
+  return contract.accept(runFn);
 }

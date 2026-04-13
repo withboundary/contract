@@ -109,15 +109,15 @@ describe("verify", () => {
     });
   });
 
-  describe("invariants", () => {
-    it("passes when invariants pass", () => {
+  describe("rules", () => {
+    it("passes when rules pass", () => {
       const result = verify({ name: "Alice", age: 30 }, Schema, [
         (data) => data.age >= 18 || "must be 18 or older",
       ]);
       expect(result.ok).toBe(true);
     });
 
-    it("fails when an invariant fails", () => {
+    it("fails when a rule fails", () => {
       const result = verify({ name: "Alice", age: 10 }, Schema, [
         (data) => data.age >= 18 || "must be 18 or older",
       ]);
@@ -129,7 +129,7 @@ describe("verify", () => {
       }
     });
 
-    it("collects multiple invariant failures", () => {
+    it("collects multiple rule failures", () => {
       const result = verify({ name: "Alice", age: 10 }, Schema, [
         (data) => data.age >= 18 || "must be 18 or older",
         (data) => data.name.length > 10 || "name too short",
@@ -140,16 +140,16 @@ describe("verify", () => {
       }
     });
 
-    it("does not run invariants when schema validation fails", () => {
-      let invariantCalled = false;
+    it("does not run rules when schema validation fails", () => {
+      let ruleCalled = false;
       const result = verify({ name: 123 }, Schema, [
         () => {
-          invariantCalled = true;
+          ruleCalled = true;
           return true;
         },
       ]);
       expect(result.ok).toBe(false);
-      expect(invariantCalled).toBe(false);
+      expect(ruleCalled).toBe(false);
     });
   });
 });
