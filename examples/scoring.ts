@@ -1,10 +1,15 @@
 /**
  * Lead scoring with tier/score alignment rules.
  *
+ * Rules enforce that the scoring decision is internally consistent:
+ *   - hot leads need high scores, cold leads need low scores
+ *   - closing a deal requires a qualified lead
+ *   - every decision needs supporting signals
+ *
  * Simulates realistic LLM failures:
  *   Attempt 1 — truncated JSON (cut off mid-response)
  *   Attempt 2 — complete JSON but tier "hot" with score 25 (mismatch)
- *   Attempt 3 — model aligns tier to score after invariant feedback
+ *   Attempt 3 — model aligns tier to score after rule feedback
  *
  *   npx tsx examples/scoring.ts
  */
@@ -52,17 +57,24 @@ async function main() {
   const contract = defineContract({
     schema: LeadSchema,
     rules: [
-      (d: Lead) =>
-        d.tier !== "hot" || d.score >= 70
-          || `tier is "hot" but score is ${d.score} (minimum 70 for hot)`,
-      (d: Lead) =>
-        d.tier !== "cold" || d.score < 30
-          || `tier is "cold" but score is ${d.score} (must be under 30 for cold)`,
-      (d: Lead) =>
-        d.nextAction !== "close" || d.qualified
+      // hot leads must have a high score
+      (lead: Lead) =>
+        lead.tier !== "hot" || lead.score >= 70
+          || `tier is "hot" but score is ${lead.score} (minimum 70 for hot)`,
+
+      // cold leads must have a low score
+      (lead: Lead) =>
+        lead.tier !== "cold" || lead.score < 30
+          || `tier is "cold" but score is ${lead.score} (must be under 30 for cold)`,
+
+      // can't close a deal on an unqualified lead
+      (lead: Lead) =>
+        lead.nextAction !== "close" || lead.qualified
           || 'nextAction is "close" but lead is not qualified',
-      (d: Lead) =>
-        d.signals.length > 0 || "must cite at least one signal",
+
+      // every scoring decision needs evidence
+      (lead: Lead) =>
+        lead.signals.length > 0 || "must cite at least one signal",
     ],
     onAttempt: (event) => {
       const status = event.ok ? "PASS" : `FAIL — ${event.category}`;

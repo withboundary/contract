@@ -46,8 +46,9 @@ async function analyzeCheap() {
     schema: AnalysisSchema,
     retry: { maxAttempts: 2 },
     rules: [
-      (d: Analysis) =>
-        d.risks.length > 0 || d.recommendation === "approve"
+      // if you're not approving, you need to explain what's risky
+      (analysis: Analysis) =>
+        analysis.risks.length > 0 || analysis.recommendation === "approve"
           || "non-approve recommendation must cite at least one risk",
     ],
     onAttempt: (event) => {
@@ -64,8 +65,9 @@ async function analyzeStrong() {
   const contract = defineContract({
     schema: AnalysisSchema,
     rules: [
-      (d: Analysis) =>
-        d.risks.length > 0 || d.recommendation === "approve"
+      // if you're not approving, you need to explain what's risky
+      (analysis: Analysis) =>
+        analysis.risks.length > 0 || analysis.recommendation === "approve"
           || "non-approve recommendation must cite at least one risk",
     ],
     onAttempt: (event) => {

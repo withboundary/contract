@@ -1,6 +1,11 @@
 /**
  * Content moderation with policy consistency rules.
  *
+ * Rules enforce that moderation decisions are internally consistent:
+ *   - blocking requires high confidence
+ *   - non-allow needs a reason and category
+ *   - allow with categories is contradictory
+ *
  * Simulates realistic LLM failures:
  *   Attempt 1 — prose-wrapped JSON ("Here is my analysis: {...}")
  *              clean extracts it, but action is "block" with confidence 0.3
@@ -56,17 +61,24 @@ async function main() {
   const contract = defineContract({
     schema: ModerationSchema,
     rules: [
-      (d: Moderation) =>
-        d.confidence >= 0.7 || d.action !== "block"
-          || `cannot block with confidence ${d.confidence} (minimum 0.7)`,
-      (d: Moderation) =>
-        d.action === "allow" || d.reason.length > 10
+      // blocking requires high confidence — prevent false positives
+      (decision: Moderation) =>
+        decision.confidence >= 0.7 || decision.action !== "block"
+          || `cannot block with confidence ${decision.confidence} (minimum 0.7)`,
+
+      // if you're flagging or blocking, explain why
+      (decision: Moderation) =>
+        decision.action === "allow" || decision.reason.length > 10
           || "blocked or flagged content must have a meaningful reason",
-      (d: Moderation) =>
-        d.action === "allow" || d.categories.length > 0
+
+      // non-allow decisions must cite at least one policy category
+      (decision: Moderation) =>
+        decision.action === "allow" || decision.categories.length > 0
           || "non-allow decisions must specify at least one category",
-      (d: Moderation) =>
-        d.action !== "allow" || d.categories.length === 0
+
+      // allow + categories is contradictory
+      (decision: Moderation) =>
+        decision.action !== "allow" || decision.categories.length === 0
           || "action is allow but categories are non-empty — contradictory",
     ],
     onAttempt: (event) => {
