@@ -3,7 +3,7 @@
  *
  * Simulates realistic LLM failures:
  *   Attempt 1 — valid JSON but empty tags array
- *   Attempt 2 — model adds tags after invariant feedback, but summary is 250+ chars
+ *   Attempt 2 — model adds tags after rule feedback, but summary is 250+ chars
  *   Attempt 3 — model returns compliant output
  *
  *   npx tsx examples/classification.ts
@@ -55,11 +55,14 @@ async function main() {
     schema: TicketSchema,
     debug: true,
     rules: [
-      (t: Ticket) =>
-        t.tags.length > 0 || "must have at least one tag",
-      (t: Ticket) =>
-        t.summary.length <= 200
-          || `summary too long: ${t.summary.length} chars (max 200)`,
+      // every ticket needs at least one tag for routing
+      (ticket: Ticket) =>
+        ticket.tags.length > 0 || "must have at least one tag",
+
+      // summaries must be concise enough for the queue view
+      (ticket: Ticket) =>
+        ticket.summary.length <= 200
+          || `summary too long: ${ticket.summary.length} chars (max 200)`,
     ],
     onAttempt: (event) => {
       const status = event.ok ? "PASS" : `FAIL — ${event.category}`;
