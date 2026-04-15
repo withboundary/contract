@@ -2,7 +2,7 @@ import { block, heading, joinLines, stringifyUnknown } from "./format.js";
 import type { ConsoleLoggerOptions, ContractLogger } from "./types.js";
 
 const DEFAULT_OPTIONS: Required<ConsoleLoggerOptions> = {
-  prefix: "[llm-contract]",
+  prefix: "[boundary]",
   showInstructions: false,
   showRepairs: true,
   showRawOutput: true,
