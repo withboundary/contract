@@ -1,5 +1,8 @@
 # @withboundary/contract
 
+[![npm version](https://img.shields.io/npm/v/@withboundary/contract.svg)](https://www.npmjs.com/package/@withboundary/contract)
+[![license](https://img.shields.io/npm/l/@withboundary/contract.svg)](https://github.com/withboundary/contract/blob/main/LICENSE)
+
 Your LLM already returns valid JSON.
 That doesn't mean it's correct.
 
