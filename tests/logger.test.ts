@@ -12,6 +12,8 @@ const Schema = z.object({
   confidence: z.number().min(0).max(1),
 });
 
+const NAME = "sentiment-logger-test";
+
 describe("logger", () => {
   it("does not log to console when logger is not enabled", async () => {
     const logSpy = vi.spyOn(console, "log").mockImplementation(() => {});
@@ -20,6 +22,7 @@ describe("logger", () => {
       const result = await enforce(
         Schema,
         async () => '{"sentiment":"neutral","confidence":0.4}',
+        { name: NAME },
       );
 
       expect(result.ok).toBe(true);
@@ -31,12 +34,15 @@ describe("logger", () => {
 
   it("fires logger hooks in stage order on retry then success", async () => {
     const calls: string[] = [];
+    const contractNames: string[] = [];
     const logger: ContractLogger = {
-      onRunStart() {
+      onRunStart(ctx) {
         calls.push("onRunStart");
+        contractNames.push(ctx.contractName);
       },
-      onAttemptStart() {
+      onAttemptStart(ctx) {
         calls.push("onAttemptStart");
+        contractNames.push(ctx.contractName);
       },
       onRawOutput() {
         calls.push("onRawOutput");
@@ -56,8 +62,9 @@ describe("logger", () => {
       onVerifySuccess() {
         calls.push("onVerifySuccess");
       },
-      onRunSuccess() {
+      onRunSuccess(ctx) {
         calls.push("onRunSuccess");
+        contractNames.push(ctx.contractName);
       },
     };
 
@@ -72,6 +79,7 @@ describe("logger", () => {
         return '{"sentiment":"positive","confidence":0.8}';
       },
       {
+        name: NAME,
         logger,
         retry: { maxAttempts: 2 },
       },
@@ -82,6 +90,8 @@ describe("logger", () => {
     expect(calls).toContain("onVerifyFailure");
     expect(calls).toContain("onRetryScheduled");
     expect(calls[calls.length - 1]).toBe("onRunSuccess");
+    // Every hook that captured ctx.contractName should have the right name.
+    expect(contractNames.every((n) => n === NAME)).toBe(true);
   });
 
   it("uses debug true to create default console logger", async () => {
@@ -92,6 +102,7 @@ describe("logger", () => {
         Schema,
         async () => '{"sentiment":"neutral","confidence":0.5}',
         {
+          name: NAME,
           debug: true,
         },
       );
@@ -121,6 +132,7 @@ describe("logger", () => {
         Schema,
         async () => '{"sentiment":"positive","confidence":0.77}',
         {
+          name: NAME,
           debug: true,
           logger,
         },
@@ -148,6 +160,7 @@ describe("logger", () => {
       Schema,
       async () => '{"sentiment":"neutral","confidence":0.66}',
       {
+        name: NAME,
         logger,
       },
     );
@@ -160,6 +173,7 @@ describe("logger", () => {
 
     try {
       const contract = defineContract({
+        name: NAME,
         schema: Schema,
         logger: createConsoleLogger({
           showInstructions: true,
@@ -173,6 +187,10 @@ describe("logger", () => {
 
       expect(result.ok).toBe(true);
       expect(logSpy).toHaveBeenCalled();
+      // Contract name should show up in the console output so users can tell
+      // which contract each line came from.
+      const calls = logSpy.mock.calls.map((args) => args.join(" "));
+      expect(calls.some((line) => line.includes(NAME))).toBe(true);
     } finally {
       logSpy.mockRestore();
     }

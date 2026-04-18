@@ -55,6 +55,7 @@ function simulateLLM(attemptNumber: number): string {
 
 async function main() {
   const contract = defineContract({
+    name: "lead-scoring",
     schema: LeadSchema,
     rules: [
       // hot leads must have a high score

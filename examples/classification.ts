@@ -52,6 +52,7 @@ function simulateLLM(attemptNumber: number): string {
 
 async function main() {
   const contract = defineContract({
+    name: "support-ticket-classification",
     schema: TicketSchema,
     debug: true,
     rules: [

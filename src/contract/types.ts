@@ -16,6 +16,36 @@ export interface Message {
   content: string;
 }
 
+// Wire format that @withboundary/sdk sends to the Boundary cloud. Exported
+// here (not in the SDK) so the SDK can re-export without duplicating types
+// and so anyone building a custom sink has a canonical shape to target.
+//
+// Fields flagged "capture.X" only appear when the corresponding capture
+// policy is enabled on the logger — see @withboundary/sdk's logger options.
+export interface BoundaryLogEvent {
+  // identity
+  contractName: string;
+  environment?: string;
+  timestamp: string; // ISO 8601
+
+  // run metadata (capture.metadata, default ON)
+  attempt: number;
+  maxAttempts: number;
+  ok: boolean;
+  durationMs: number;
+
+  // failure details (capture.errors, default ON)
+  category?: FailureCategory;
+  issues?: string[];
+
+  // repair context (capture.repairs, default ON)
+  repairs?: Message[];
+
+  // raw data (both default OFF — opt-in only)
+  input?: unknown;
+  output?: unknown;
+}
+
 export interface AttemptDetail {
   raw: string;
   cleaned: unknown;
@@ -104,5 +134,11 @@ export interface DefinedContract<T> {
 }
 
 export interface ContractConfig<T> extends ContractOptions<T> {
+  // Human-readable identifier for this contract. Required so every run carries
+  // identity end-to-end — it flows through every ContractLogger hook context
+  // and lands on the Boundary dashboard's trace records. Pick something you'd
+  // want to see in a log line: "lead-scoring", "invoice-extraction",
+  // "agent-action-validation".
+  name: string;
   schema: ZodType<T>;
 }

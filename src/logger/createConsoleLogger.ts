@@ -23,19 +23,25 @@ export function createConsoleLogger<T = unknown>(
     console.log(joinLines(lines));
   };
 
+  // Format the prefix with the contract name so lines read:
+  //   [boundary] lead-scoring · Run started
+  // instead of hiding the contract identity in a separate line.
+  const scoped = (contractName: string): string =>
+    `${resolvedOptions.prefix} ${contractName} ·`;
+
   return {
     onRunStart(ctx) {
       print(
-        heading(resolvedOptions.prefix, "Run started"),
+        heading(scoped(ctx.contractName), "Run started"),
         `Attempts: ${ctx.maxAttempts}`,
-        `Invariants: ${ctx.hasInvariants ? "yes" : "no"}`,
+        `Rules: ${ctx.hasRules ? "yes" : "no"}`,
         `Backoff: ${ctx.retry.backoff}`,
       );
     },
     onAttemptStart(ctx) {
       const lines: string[] = [
         heading(
-          resolvedOptions.prefix,
+          scoped(ctx.contractName),
           `Attempt ${ctx.attempt}/${ctx.maxAttempts}`,
         ),
       ];
@@ -61,7 +67,7 @@ export function createConsoleLogger<T = unknown>(
         return;
       }
       print(
-        heading(resolvedOptions.prefix, `Raw output (attempt ${ctx.attempt})`),
+        heading(scoped(ctx.contractName), `Raw output (attempt ${ctx.attempt})`),
         stringifyUnknown(ctx.raw, resolvedOptions),
       );
     },
@@ -71,7 +77,7 @@ export function createConsoleLogger<T = unknown>(
       }
       print(
         heading(
-          resolvedOptions.prefix,
+          scoped(ctx.contractName),
           `Cleaned output (attempt ${ctx.attempt})`,
         ),
         stringifyUnknown(ctx.cleaned, resolvedOptions),
@@ -80,7 +86,7 @@ export function createConsoleLogger<T = unknown>(
     onVerifySuccess(ctx) {
       const lines = [
         heading(
-          resolvedOptions.prefix,
+          scoped(ctx.contractName),
           `Verification passed (attempt ${ctx.attempt})`,
         ),
         `Duration: ${ctx.durationMs}ms`,
@@ -93,7 +99,7 @@ export function createConsoleLogger<T = unknown>(
     onVerifyFailure(ctx) {
       print(
         heading(
-          resolvedOptions.prefix,
+          scoped(ctx.contractName),
           `Verification failed (attempt ${ctx.attempt})`,
         ),
         `Category: ${ctx.category}`,
@@ -104,7 +110,7 @@ export function createConsoleLogger<T = unknown>(
     onRepairGenerated(ctx) {
       print(
         heading(
-          resolvedOptions.prefix,
+          scoped(ctx.contractName),
           `Repair generated (attempt ${ctx.attempt})`,
         ),
         `Category: ${ctx.category}`,
@@ -114,7 +120,7 @@ export function createConsoleLogger<T = unknown>(
     onRetryScheduled(ctx) {
       print(
         heading(
-          resolvedOptions.prefix,
+          scoped(ctx.contractName),
           `Retry scheduled (attempt ${ctx.attempt})`,
         ),
         `Next attempt: ${ctx.nextAttempt}`,
@@ -124,14 +130,14 @@ export function createConsoleLogger<T = unknown>(
     },
     onRunSuccess(ctx) {
       print(
-        heading(resolvedOptions.prefix, "Run succeeded"),
+        heading(scoped(ctx.contractName), "Run succeeded"),
         `Attempts: ${ctx.attempts}`,
         `Total duration: ${ctx.totalDurationMs}ms`,
       );
     },
     onRunFailure(ctx) {
       print(
-        heading(resolvedOptions.prefix, "Run failed"),
+        heading(scoped(ctx.contractName), "Run failed"),
         `Attempts: ${ctx.attempts}`,
         `Category: ${ctx.category ?? "unknown"}`,
         `Message: ${ctx.message}`,

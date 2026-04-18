@@ -42,7 +42,7 @@ Here is the extracted data:
 \`\`\`
 
 Let me know if you need anything else!`;
-    });
+    }, { name: "invoice-extraction" });
 
     expect(result.ok).toBe(true);
     if (result.ok) {
@@ -65,7 +65,7 @@ Let me know if you need anything else!`;
         return '{"score": "85", "grade": "excellent"}';
       }
       return '{"score": "85", "grade": "A"}';
-    });
+    }, { name: "score-coercion" });
 
     expect(result.ok).toBe(true);
     if (result.ok) {
@@ -88,6 +88,7 @@ Let me know if you need anything else!`;
         return '{"subtotal": 100, "tax": 10, "total": 90}';
       },
       {
+        name: "order-math",
         retry: { maxAttempts: 1 },
         rules: [
           (o) =>
@@ -175,7 +176,7 @@ describe("integration: multi-step chain", () => {
 
     const planResult = await enforce(PlanSchema, async () => {
       return '{"steps": ["analyze", "implement", "test"]}';
-    });
+    }, { name: "plan" });
 
     expect(planResult.ok).toBe(true);
     if (!planResult.ok) { return; }
@@ -186,7 +187,7 @@ describe("integration: multi-step chain", () => {
         summary: `Plan has ${stepCount} steps`,
         stepCount,
       });
-    });
+    }, { name: "summary" });
 
     expect(summaryResult.ok).toBe(true);
     if (summaryResult.ok) {
@@ -206,6 +207,7 @@ describe("integration: error classification end-to-end", () => {
         return "I'm sorry, I cannot assist with that request.";
       },
       {
+        name: "refusal-stops",
         retry: { maxAttempts: 5 },
         repairs: { REFUSAL: false },
       },
@@ -229,6 +231,7 @@ describe("integration: error classification end-to-end", () => {
         }
         return '{"name": "Alice", "age": 30}';
       },
+      { name: "truncation-retry" },
     );
 
     expect(result.ok).toBe(true);
@@ -252,6 +255,7 @@ describe("integration: error classification end-to-end", () => {
         return '{"data": "extracted"}';
       },
       {
+        name: "no-json-override",
         repairs: {
           NO_JSON: () => [
             { role: "user", content: "DOMAIN: respond as JSON extraction" },

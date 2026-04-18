@@ -83,6 +83,7 @@ function simulateLLM(attemptNumber: number): string {
 
 async function main() {
   const contract = defineContract({
+    name: "invoice-extraction",
     schema: InvoiceSchema,
     rules: [
       // invoice must contain at least one line item

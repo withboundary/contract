@@ -22,6 +22,7 @@ import {
 import { success } from "../result/success.js";
 
 export async function runContract<T>(
+  contractName: string,
   schema: ZodType<T>,
   run: RunFn,
   options: NormalizedContractOptions<T>,
@@ -39,6 +40,7 @@ export async function runContract<T>(
 
   const totalStart = Date.now();
   emitLogger(logger, "onRunStart", {
+    contractName,
     maxAttempts: options.retry.maxAttempts,
     hasRules: Boolean(options.rules && options.rules.length > 0),
     retry: options.retry,
@@ -57,6 +59,7 @@ export async function runContract<T>(
       previousCategory,
     };
     emitLogger(logger, "onAttemptStart", {
+      contractName,
       attempt: attemptNum,
       maxAttempts: options.retry.maxAttempts,
       instructions: schemaInstructions,
@@ -72,7 +75,7 @@ export async function runContract<T>(
     } catch (error) {
       const message = error instanceof Error ? error.message : String(error);
       raw = "";
-      emitLogger(logger, "onRawOutput", { attempt: attemptNum, raw });
+      emitLogger(logger, "onRawOutput", { contractName, attempt: attemptNum, raw });
       const detail = createAttemptDetail(
         raw,
         null,
@@ -80,6 +83,7 @@ export async function runContract<T>(
         "RUN_ERROR",
       );
       const handled = handleFailure(
+        contractName,
         detail,
         attemptDetails,
         attemptNum,
@@ -91,6 +95,7 @@ export async function runContract<T>(
       if (handled.shouldStop) {
         const contractError = createContractError(attemptDetails);
         emitLogger(logger, "onRunFailure", {
+          contractName,
           attempts: attemptDetails.length,
           category: detail.category,
           message: contractError.message,
@@ -101,13 +106,13 @@ export async function runContract<T>(
       currentRepairs = handled.repairs;
       previousError = createContractError(attemptDetails);
       previousCategory = detail.category;
-      emitRetry(logger, attemptNum, detail.category, options.retry.maxAttempts, options.retry);
+      emitRetry(logger, contractName, attemptNum, detail.category, options.retry.maxAttempts, options.retry);
       continue;
     }
 
-    emitLogger(logger, "onRawOutput", { attempt: attemptNum, raw });
+    emitLogger(logger, "onRawOutput", { contractName, attempt: attemptNum, raw });
     const cleaned = clean(raw);
-    emitLogger(logger, "onCleanedOutput", { attempt: attemptNum, cleaned });
+    emitLogger(logger, "onCleanedOutput", { contractName, attempt: attemptNum, cleaned });
     if (cleaned === null || cleaned === undefined) {
       const category = classify(raw, cleaned);
       const detail = createAttemptDetail(
@@ -117,6 +122,7 @@ export async function runContract<T>(
         category,
       );
       const handled = handleFailure(
+        contractName,
         detail,
         attemptDetails,
         attemptNum,
@@ -128,6 +134,7 @@ export async function runContract<T>(
       if (handled.shouldStop) {
         const contractError = createContractError(attemptDetails);
         emitLogger(logger, "onRunFailure", {
+          contractName,
           attempts: attemptDetails.length,
           category: detail.category,
           message: contractError.message,
@@ -138,7 +145,7 @@ export async function runContract<T>(
       currentRepairs = handled.repairs;
       previousError = createContractError(attemptDetails);
       previousCategory = detail.category;
-      emitRetry(logger, attemptNum, detail.category, options.retry.maxAttempts, options.retry);
+      emitRetry(logger, contractName, attemptNum, detail.category, options.retry.maxAttempts, options.retry);
       continue;
     }
 
@@ -147,11 +154,13 @@ export async function runContract<T>(
       const durationMs = Date.now() - start;
       emitAttempt(options, attemptNum, true, raw, [], durationMs);
       emitLogger(logger, "onVerifySuccess", {
+        contractName,
         attempt: attemptNum,
         data: verifyResult.data,
         durationMs,
       });
       emitLogger(logger, "onRunSuccess", {
+        contractName,
         attempts: attemptNum,
         data: verifyResult.data,
         totalDurationMs: Date.now() - totalStart,
@@ -172,12 +181,14 @@ export async function runContract<T>(
       verifyDetail?.category ?? "VALIDATION_ERROR",
     );
     emitLogger(logger, "onVerifyFailure", {
+      contractName,
       attempt: attemptNum,
       category: detail.category,
       issues: detail.issues,
       durationMs: Date.now() - start,
     });
     const handled = handleFailure(
+      contractName,
       detail,
       attemptDetails,
       attemptNum,
@@ -189,6 +200,7 @@ export async function runContract<T>(
     if (handled.shouldStop) {
       const contractError = createContractError(attemptDetails);
       emitLogger(logger, "onRunFailure", {
+        contractName,
         attempts: attemptDetails.length,
         category: detail.category,
         message: contractError.message,
@@ -199,12 +211,13 @@ export async function runContract<T>(
     currentRepairs = handled.repairs;
     previousError = createContractError(attemptDetails);
     previousCategory = detail.category;
-    emitRetry(logger, attemptNum, detail.category, options.retry.maxAttempts, options.retry);
+    emitRetry(logger, contractName, attemptNum, detail.category, options.retry.maxAttempts, options.retry);
   }
 
   const contractError = createContractError(attemptDetails);
   const lastCategory = attemptDetails[attemptDetails.length - 1]?.category;
   emitLogger(logger, "onRunFailure", {
+    contractName,
     attempts: attemptDetails.length,
     category: lastCategory,
     message: contractError.message,
@@ -220,6 +233,7 @@ function isFailureResult<T>(
 }
 
 function handleFailure<T>(
+  contractName: string,
   detail: AttemptDetail,
   attemptDetails: AttemptDetail[],
   attemptNum: number,
@@ -242,6 +256,7 @@ function handleFailure<T>(
   const repairResult = repair(detail, options.repairs);
   if (repairResult === false) {
     emitLogger(logger, "onRepairGenerated", {
+      contractName,
       attempt: attemptNum,
       category: detail.category,
       repairMessage: "(disabled by repair override)",
@@ -249,6 +264,7 @@ function handleFailure<T>(
     return { shouldStop: true, repairs: [] };
   }
   emitLogger(logger, "onRepairGenerated", {
+    contractName,
     attempt: attemptNum,
     category: detail.category,
     repairMessage: repairResult.map((message) => message.content).join("\n"),
@@ -289,6 +305,7 @@ function describeFailure(category: FailureCategory, raw: string): string {
 
 function emitRetry<T>(
   logger: ContractLogger<T> | undefined,
+  contractName: string,
   attemptNum: number,
   category: FailureCategory,
   maxAttempts: number,
@@ -299,6 +316,7 @@ function emitRetry<T>(
   }
 
   emitLogger(logger, "onRetryScheduled", {
+    contractName,
     attempt: attemptNum,
     nextAttempt: attemptNum + 1,
     category,

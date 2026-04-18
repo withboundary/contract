@@ -8,11 +8,13 @@ const Schema = z.object({
   confidence: z.number().min(0).max(1),
 });
 
+const NAME = "sentiment-test";
+
 describe("enforce", () => {
   it("succeeds on first attempt with valid JSON", async () => {
     const result = await enforce(Schema, async () => {
       return '{"sentiment": "positive", "confidence": 0.95}';
-    });
+    }, { name: NAME });
 
     expect(result.ok).toBe(true);
     if (result.ok) {
@@ -27,7 +29,7 @@ describe("enforce", () => {
   it("succeeds on first attempt with fenced JSON", async () => {
     const result = await enforce(Schema, async () => {
       return '```json\n{"sentiment": "negative", "confidence": 0.8}\n```';
-    });
+    }, { name: NAME });
 
     expect(result.ok).toBe(true);
     if (result.ok) {
@@ -45,7 +47,7 @@ describe("enforce", () => {
       expect(attempt.repairs.length).toBeGreaterThan(0);
       expect(attempt.previousCategory).toBe("VALIDATION_ERROR");
       return '{"sentiment": "positive", "confidence": 0.9}';
-    });
+    }, { name: NAME });
 
     expect(result.ok).toBe(true);
     if (result.ok) {
@@ -60,7 +62,7 @@ describe("enforce", () => {
       async () => {
         return '{"sentiment": "invalid", "confidence": 2.0}';
       },
-      { retry: { maxAttempts: 2 } },
+      { name: NAME, retry: { maxAttempts: 2 } },
     );
 
     expect(result.ok).toBe(false);
@@ -82,7 +84,7 @@ describe("enforce", () => {
         }
         return '{"sentiment": "neutral", "confidence": 0.5}';
       },
-      { retry: { maxAttempts: 3 } },
+      { name: NAME, retry: { maxAttempts: 3 } },
     );
 
     expect(result.ok).toBe(true);
@@ -97,7 +99,7 @@ describe("enforce", () => {
       async () => {
         throw new Error("API down");
       },
-      { retry: { maxAttempts: 2 } },
+      { name: NAME, retry: { maxAttempts: 2 } },
     );
 
     expect(result.ok).toBe(false);
@@ -112,7 +114,7 @@ describe("enforce", () => {
     const result = await enforce(
       Schema,
       async () => null,
-      { retry: { maxAttempts: 1 } },
+      { name: NAME, retry: { maxAttempts: 1 } },
     );
 
     expect(result.ok).toBe(false);
@@ -125,7 +127,7 @@ describe("enforce", () => {
     const result = await enforce(
       Schema,
       async () => "I'm sorry, I can't assist with that request.",
-      { retry: { maxAttempts: 1 } },
+      { name: NAME, retry: { maxAttempts: 1 } },
     );
 
     expect(result.ok).toBe(false);
@@ -138,7 +140,7 @@ describe("enforce", () => {
     const result = await enforce(
       Schema,
       async () => '{"sentiment": "positive", "confidence":',
-      { retry: { maxAttempts: 1 } },
+      { name: NAME, retry: { maxAttempts: 1 } },
     );
 
     expect(result.ok).toBe(false);
@@ -151,7 +153,7 @@ describe("enforce", () => {
     const result = await enforce(
       Schema,
       async () => "The sentiment is positive with high confidence.",
-      { retry: { maxAttempts: 1 } },
+      { name: NAME, retry: { maxAttempts: 1 } },
     );
 
     expect(result.ok).toBe(false);
@@ -167,6 +169,7 @@ describe("enforce", () => {
         return '{"sentiment": "positive", "confidence": 0.3}';
       },
       {
+        name: NAME,
         retry: { maxAttempts: 1 },
         rules: [
           (d) => d.confidence >= 0.5 || "confidence too low",
@@ -190,6 +193,7 @@ describe("enforce", () => {
         return "I'm sorry, I cannot help with that.";
       },
       {
+        name: NAME,
         retry: { maxAttempts: 5 },
         repairs: { REFUSAL: false },
       },
@@ -220,6 +224,7 @@ describe("enforce", () => {
         return '{"sentiment": "positive", "confidence": 0.9}';
       },
       {
+        name: NAME,
         retry: { maxAttempts: 3 },
         repairs: {
           EMPTY_RESPONSE: () => [
@@ -241,6 +246,7 @@ describe("enforce", () => {
         return '{"sentiment": "positive", "confidence": 0.9}';
       },
       {
+        name: NAME,
         onAttempt: (event) => {
           events.push(event);
         },
@@ -259,6 +265,7 @@ describe("enforce", () => {
       Schema,
       async () => "Just some text.",
       {
+        name: NAME,
         retry: { maxAttempts: 1 },
         onAttempt: (event) => {
           events.push(event);
@@ -277,7 +284,7 @@ describe("enforce", () => {
     await enforce(Schema, async (attempt) => {
       receivedInstructions = attempt.instructions;
       return '{"sentiment": "positive", "confidence": 0.9}';
-    });
+    }, { name: NAME });
 
     expect(receivedInstructions).toContain("JSON");
     expect(receivedInstructions).toContain("sentiment");
@@ -290,6 +297,7 @@ describe("enforce", () => {
       receivedInstructions = attempt.instructions;
       return '{"sentiment": "positive", "confidence": 0.9}';
     }, {
+      name: NAME,
       instructions: {
         suffix: "If an optional field is unknown, omit it.",
       },
@@ -308,12 +316,13 @@ describe("enforce", () => {
     await enforce(Schema, async (attempt) => {
       instructionsWithout = attempt.instructions;
       return '{"sentiment": "positive", "confidence": 0.9}';
-    });
+    }, { name: NAME });
 
     await enforce(Schema, async (attempt) => {
       instructionsWith = attempt.instructions;
       return '{"sentiment": "positive", "confidence": 0.9}';
     }, {
+      name: NAME,
       instructions: {
         suffix: "Extra instruction.",
       },
@@ -327,7 +336,7 @@ describe("enforce", () => {
   it("coerces string types during clean", async () => {
     const result = await enforce(Schema, async () => {
       return '{"sentiment": "positive", "confidence": "0.85"}';
-    });
+    }, { name: NAME });
 
     expect(result.ok).toBe(true);
     if (result.ok) {
@@ -337,6 +346,7 @@ describe("enforce", () => {
 
   it("supports defineContract with runtime option overrides", async () => {
     const contract = defineContract({
+      name: NAME,
       schema: Schema,
       retry: { maxAttempts: 2 },
       instructions: { suffix: "Base suffix." },
@@ -378,6 +388,7 @@ describe("enforce", () => {
       Schema,
       async () => '{"sentiment":"positive","confidence":0.92}',
       {
+        name: NAME,
         logger,
         onAttempt: (event) => {
           attemptEvents.push(event);
@@ -398,11 +409,25 @@ describe("enforce", () => {
       Schema,
       async () => '{"sentiment":"neutral","confidence":0.88}',
       {
+        name: NAME,
         debug: true,
         logger,
       },
     );
 
     expect(result.ok).toBe(true);
+  });
+
+  it("throws TypeError when name is missing", () => {
+    expect(() =>
+      // @ts-expect-error intentionally missing name to verify runtime guard
+      defineContract({ schema: Schema }),
+    ).toThrow(TypeError);
+  });
+
+  it("throws TypeError when name is empty string", () => {
+    expect(() => defineContract({ name: "   ", schema: Schema })).toThrow(
+      TypeError,
+    );
   });
 });

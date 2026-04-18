@@ -59,6 +59,7 @@ Let me know if you need anything else!`;
 
 async function main() {
   const contract = defineContract({
+    name: "content-moderation",
     schema: ModerationSchema,
     rules: [
       // blocking requires high confidence — prevent false positives

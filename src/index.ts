@@ -18,6 +18,7 @@ export type {
   AttemptDetail,
   AttemptEvent,
   AttemptHook,
+  BoundaryLogEvent,
   ContractConfig,
   ContractError,
   ContractOptions,

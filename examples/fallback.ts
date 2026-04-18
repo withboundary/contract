@@ -43,6 +43,7 @@ function simulateStrongModel(_attemptNumber: number): string {
 async function analyzeCheap() {
   console.log("--- Cheap model ---");
   const contract = defineContract({
+    name: "analysis-cheap",
     schema: AnalysisSchema,
     retry: { maxAttempts: 2 },
     rules: [
@@ -63,6 +64,7 @@ async function analyzeCheap() {
 async function analyzeStrong() {
   console.log("--- Strong model ---");
   const contract = defineContract({
+    name: "analysis-strong",
     schema: AnalysisSchema,
     rules: [
       // if you're not approving, you need to explain what's risky
