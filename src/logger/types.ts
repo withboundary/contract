@@ -17,7 +17,10 @@ export type ContractLogger<T = unknown> = {
   onRunStart?: (ctx: {
     contractName: string;
     maxAttempts: number;
-    hasRules: boolean;
+    rulesCount: number;
+    // Per-call model override (from `accept(run, { model })`). When absent,
+    // loggers should fall back to their own default.
+    model?: string;
     retry: {
       maxAttempts: number;
       backoff: RetryBackoffMode;

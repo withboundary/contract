@@ -42,7 +42,8 @@ export async function runContract<T>(
   emitLogger(logger, "onRunStart", {
     contractName,
     maxAttempts: options.retry.maxAttempts,
-    hasRules: Boolean(options.rules && options.rules.length > 0),
+    rulesCount: options.rules?.length ?? 0,
+    model: options.model,
     retry: options.retry,
   });
 

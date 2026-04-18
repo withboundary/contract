@@ -44,6 +44,15 @@ export interface BoundaryLogEvent {
   // raw data (both default OFF — opt-in only)
   input?: unknown;
   output?: unknown;
+
+  // Name of the LLM that produced the output, e.g. "gpt-4o", "claude-haiku".
+  // Sourced from the logger default and overridable per call via
+  // `contract.accept(run, { model })`.
+  model?: string;
+
+  // Number of rules defined on the contract at runtime. Latest-seen —
+  // every event carries the current count.
+  rulesCount?: number;
 }
 
 export interface AttemptDetail {
@@ -107,6 +116,10 @@ export interface ContractOptions<T = unknown> {
   onAttempt?: AttemptHook;
   logger?: ContractLogger<T>;
   debug?: boolean;
+  // Optional per-call model label. When set on `accept(run, { model })`,
+  // it overrides the logger's default model on that run. Purely metadata —
+  // it doesn't affect contract behavior, it just flows into BoundaryLogEvent.
+  model?: string;
 }
 
 export type RunFn = (attempt: ContractAttempt) => Promise<string | null>;

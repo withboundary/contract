@@ -12,6 +12,7 @@ export interface NormalizedContractOptions<T> {
   };
   onAttempt?: ContractOptions<T>["onAttempt"];
   logger?: ContractLogger<T>;
+  model?: string;
 }
 
 export function normalizeOptions<T>(
@@ -30,6 +31,7 @@ export function normalizeOptions<T>(
     },
     onAttempt: options?.onAttempt,
     logger: resolveLogger(options),
+    model: options?.model,
   };
 }
 
@@ -57,6 +59,7 @@ export function mergeOptions<T>(
     onAttempt: override?.onAttempt ?? base?.onAttempt,
     logger: override?.logger ?? base?.logger,
     debug: override?.debug ?? base?.debug,
+    model: override?.model ?? base?.model,
   });
 }
 

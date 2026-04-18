@@ -146,6 +146,63 @@ describe("logger", () => {
     }
   });
 
+  it("onRunStart receives rulesCount matching rules.length", async () => {
+    const starts: Array<{ rulesCount: number; model?: string }> = [];
+    const logger: ContractLogger = {
+      onRunStart(ctx) {
+        starts.push({ rulesCount: ctx.rulesCount, model: ctx.model });
+      },
+    };
+
+    // No rules defined — rulesCount should be 0.
+    await enforce(
+      Schema,
+      async () => '{"sentiment":"neutral","confidence":0.5}',
+      { name: NAME, logger },
+    );
+    expect(starts[0]?.rulesCount).toBe(0);
+
+    // Two rules defined — rulesCount should be 2.
+    starts.length = 0;
+    await enforce(
+      Schema,
+      async () => '{"sentiment":"positive","confidence":0.9}',
+      {
+        name: NAME,
+        logger,
+        rules: [
+          (d) => d.confidence >= 0.5 || "confidence too low",
+          (d) => d.sentiment !== "neutral" || "neutral not allowed",
+        ],
+      },
+    );
+    expect(starts[0]?.rulesCount).toBe(2);
+  });
+
+  it("per-call model override flows into onRunStart ctx", async () => {
+    const starts: Array<string | undefined> = [];
+    const logger: ContractLogger = {
+      onRunStart(ctx) {
+        starts.push(ctx.model);
+      },
+    };
+
+    const contract = defineContract({
+      name: NAME,
+      schema: Schema,
+      logger,
+      model: "gpt-4o",
+    });
+
+    await contract.accept(async () => '{"sentiment":"positive","confidence":0.9}');
+    await contract.accept(
+      async () => '{"sentiment":"negative","confidence":0.8}',
+      { model: "claude-haiku-4-5" },
+    );
+
+    expect(starts).toEqual(["gpt-4o", "claude-haiku-4-5"]);
+  });
+
   it("logger errors do not break run behavior", async () => {
     const logger: ContractLogger = {
       onRunStart() {

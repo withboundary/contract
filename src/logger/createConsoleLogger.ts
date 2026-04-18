@@ -31,12 +31,14 @@ export function createConsoleLogger<T = unknown>(
 
   return {
     onRunStart(ctx) {
-      print(
+      const lines = [
         heading(scoped(ctx.contractName), "Run started"),
         `Attempts: ${ctx.maxAttempts}`,
-        `Rules: ${ctx.hasRules ? "yes" : "no"}`,
+        `Rules: ${ctx.rulesCount > 0 ? ctx.rulesCount : "none"}`,
         `Backoff: ${ctx.retry.backoff}`,
-      );
+      ];
+      if (ctx.model) lines.splice(3, 0, `Model: ${ctx.model}`);
+      print(...lines);
     },
     onAttemptStart(ctx) {
       const lines: string[] = [
