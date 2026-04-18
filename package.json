@@ -1,6 +1,6 @@
 {
   "name": "@withboundary/contract",
-  "version": "1.0.0",
+  "version": "1.1.0",
   "description": "Make LLM outputs correct, not just valid. Schema + rules + auto-repair.",
   "type": "module",
   "main": "./dist/index.js",
